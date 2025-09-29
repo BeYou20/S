@@ -1,6 +1,6 @@
 // Offer.js - منطق نموذج التسجيل للعروض الخاصة (الإصدار النهائي والموحد والأقوى)
 
-const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyY4lbL6t-YJWwqYfd0dhkzFQz_8Rhykyx4V1GCabC4JkuDH5XI52K50UbDfM9BS0jaoA/exec'; 
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbweX983lj4xsTDLo6C64usEcnbFmLST2aQ4v79zjKgIv2v5zGAJERurt_eLXf58dZhtIw/exec'; 
 // ملاحظة: تأكد أن المتغيرين INSTITUTION_WHATSAPP_NUMBER و arabCountries مُعرَّفان في مكان آخر بالصفحة.
 
 document.addEventListener('DOMContentLoaded', () => {
