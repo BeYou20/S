@@ -2,6 +2,11 @@
 
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbweX983lj4xsTDLo6C64usEcnbFmLST2aQ4v79zjKgIv2v5zGAJERurt_eLXf58dZhtIw/exec'; 
 
+// 🛑 الحل 1-2: تعريف المتغير INSTITUTION_WHATSAPP_NUMBER إذا لم يكن معرّفاً في مكان آخر
+// يرجى وضع رقم واتساب مؤسستك بالصيغة الدولية بدون (+) هنا:
+const INSTITUTION_WHATSAPP_NUMBER = window.INSTITUTION_WHATSAPP_NUMBER || '967700000000'; 
+// يمكنك استبدال '967700000000' برقم حقيقي.
+
 // Offer.js - منطق نموذج التسجيل للعروض الخاصة (الإصدار النهائي والمُصحَّح)
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -23,6 +28,9 @@ document.addEventListener('DOMContentLoaded', () => {
      * يبني رسالة الواتساب النهائية بعد نجاح الإرسال.
      */
     const buildWhatsappURL = (dataObj, coursesString, coursesCount) => {
+        // 🛑 الحل 1-1: جعل الدالة دفاعية للتحقق من وجود رقم الواتساب
+        const phone = (typeof INSTITUTION_WHATSAPP_NUMBER !== 'undefined') ? INSTITUTION_WHATSAPP_NUMBER : null;
+        
         let messageBody = `مرحباً مؤسسة كن أنت، أرجو تأكيد اشتراكي في عرض VIP. هذه بيانات التسجيل المرسلة عبر النموذج:`;
 
         for (const [key, value] of Object.entries(dataObj)) {
@@ -33,8 +41,12 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const encodedMessage = encodeURIComponent(messageBody);
         
-        // يعتمد على المتغير INSTITUTION_WHATSAPP_NUMBER المُعرّف في ملف url.js
-        return `https://wa.me/${INSTITUTION_WHATSAPP_NUMBER}?text=${encodedMessage}`;
+        if (!phone) {
+             console.warn('INSTITUTION_WHATSAPP_NUMBER غير معرف أو فارغ. لن يتم إعادة التوجيه للواتساب.');
+             return null; // إرجاع قيمة فارغة لتجنب التوجيه غير الصحيح
+        }
+        
+        return `https://wa.me/${phone}?text=${encodedMessage}`;
     };
 
     /**
@@ -119,20 +131,29 @@ document.addEventListener('DOMContentLoaded', () => {
             coursesListContainer.innerHTML = '';
             if (coursesMatrix.length > 0) {
                 coursesMatrix.forEach(course => {
+                    // 🛑 الحل 3: استخدام DOM API لتوليد العناصر بدلاً من innerHTML string لتجنب مشاكل التعليقات
                     const label = document.createElement('label');
                     label.classList.add('course-item');
-                    label.innerHTML = `
-                        <input 
-                            type="checkbox" 
-                            name="courses_selected" 
-                            value="${course.id}" 
-                            aria-label="${course.title}"
-                            data-title="${course.title}" // 🛑 التأكد من إضافة اسم الدورة هنا
-                        >
-                        <span class="custom-checkbox"></span>
-                        <span class="course-title"><i class="fa-solid fa-circle-check"></i> ${course.title}</span>
-                        <span class="course-description">${course.heroDescription || ''}</span>
-                    `;
+                    
+                    const input = document.createElement('input');
+                    input.type = 'checkbox';
+                    input.name = 'courses_selected_ids'; // 🛑 تغيير الاسم لجمع الـ IDs فقط
+                    input.value = course.id; 
+                    input.setAttribute('aria-label', course.title);
+                    input.dataset.title = course.title; // تخزين العنوان بأمان
+
+                    const spanCheckbox = document.createElement('span');
+                    spanCheckbox.className = 'custom-checkbox';
+
+                    const spanTitle = document.createElement('span');
+                    spanTitle.className = 'course-title';
+                    spanTitle.innerHTML = `<i class="fa-solid fa-circle-check"></i> ${course.title}`;
+
+                    const spanDesc = document.createElement('span');
+                    spanDesc.className = 'course-description';
+                    spanDesc.textContent = course.heroDescription || '';
+                    
+                    label.append(input, spanCheckbox, spanTitle, spanDesc);
                     coursesListContainer.appendChild(label);
                 });
                 
@@ -192,7 +213,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return !message;
     };
     
-    // 🛑 التعديل الأخير هنا: تم تبسيط عملية التحقق وتفعيل الزر
     const validateForm = () => {
         let isFormValid = true;
         // 1. التحقق من الحقول الفردية
@@ -220,7 +240,6 @@ document.addEventListener('DOMContentLoaded', () => {
         updateSelectionStatus();
     };
     
-    // 🛑 التعديل الأخير هنا: تم تبسيط عملية التحقق من حالة الاختيار
     const updateSelectionStatus = (updateValidation = true) => {
         if (!courseCheckboxes) return false;
         const checkedCount = Array.from(courseCheckboxes).filter(cb => cb.checked).length;
@@ -237,7 +256,6 @@ document.addEventListener('DOMContentLoaded', () => {
             coursesErrorElement.textContent = (checkedCount === 0) ? 'الرجاء اختيار دورتين على الأقل.' : `تحتاج لاختيار ${MIN_SELECTION - checkedCount} دورة إضافية.`;
             coursesErrorElement.style.display = 'block';
             
-            // نطلب إعادة التحقق من الفورم بعد تغيير الاختيار
             if (updateValidation) validateForm();
             return false;
         } else {
@@ -245,7 +263,6 @@ document.addEventListener('DOMContentLoaded', () => {
             statusDisplay.classList.add('status-success');
             statusDisplay.textContent = `اختيار موفق! تم اختيار ${checkedCount} دورة. أكمل بيانات التسجيل وأرسلها.`;
             
-            // نطلب إعادة التحقق من الفورم بعد تغيير الاختيار
             if (updateValidation) validateForm();
             return true;
         }
@@ -254,7 +271,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // 5. منطق الإرسال الرئيسي (Submission)
     form.addEventListener('submit', async function(e) {
         e.preventDefault(); 
-        // 🛑 نستخدم validateForm للتأكد من حالة الزر قبل الإرسال
         if (!validateForm()) return; 
 
         submitButton.textContent = 'جاري إرسال البيانات...';
@@ -262,11 +278,25 @@ document.addEventListener('DOMContentLoaded', () => {
         loadingIndicator.style.display = 'flex'; 
         submissionMessage.style.display = 'none';
 
+        // 🛑 الحل 2: بناء URLSearchParams يدوياً لإضافة عناوين الدورات
         const formData = new FormData(this);
-        const urlParams = new URLSearchParams(formData); 
-        const selectedCourseElements = Array.from(courseCheckboxes).filter(cb => cb.checked);
-        const coursesString = [];
+        const selectedCbs = Array.from(courseCheckboxes).filter(cb => cb.checked);
         
+        // جمع ids وعناوين الدورات
+        const selectedIds = selectedCbs.map(cb => cb.value);
+        const selectedTitles = selectedCbs.map(cb => cb.dataset.title || cb.getAttribute('aria-label') || cb.value);
+        const coursesStringJoined = selectedTitles.join('، '); 
+
+        // بناء URLSearchParams نظيف
+        const urlParams = new URLSearchParams();
+        for (const [k, v] of formData.entries()) {
+            if (k === 'courses_selected_ids') continue; // تجاوز حقل الـ IDs الذي تم تعريفه في الـ input
+            urlParams.append(k, v);
+        }
+        // إضافة الحقول المجمعة الجديدة لـ Google Sheet
+        urlParams.append('courses_selected_ids', selectedIds.join('، ')); 
+        urlParams.append('courses_selected_titles', coursesStringJoined); // إرسال العناوين
+
         const allFields = {
             'الاسم الكامل': formData.get('الاسم الكامل'),
             'البريد الإلكتروني': formData.get('البريد الإلكتروني'),
@@ -276,30 +306,18 @@ document.addEventListener('DOMContentLoaded', () => {
             'البلد': formData.get('البلد'), 
             'ملاحظات إضافية': formData.get('ملاحظات إضافية') || 'لا توجد',
         };
-        
-        // 🛑 التعديل الجذري هنا: لضمان الحصول على اسم الدورة (title)
-        selectedCourseElements.forEach(checkbox => {
-            let courseName = checkbox.dataset.title; // المحاولة الأولى: dataset
-            
-            // المحاولة الثانية: الحل البديل عبر aria-label
-            if (!courseName || courseName.trim() === '') {
-                courseName = checkbox.getAttribute('aria-label') || checkbox.value; 
-            }
-            coursesString.push(courseName);
-        }); 
-        const coursesStringJoined = coursesString.join('، '); 
 
         try {
             // الإرسال لجدول Google Sheet 
-            // 🛑 استخدام mode: 'no-cors' وحذف 'await' لضمان إرسال البيانات وتجاوز الخطأ الكاذب
+            // 🛑 استخدام fetch بدون await وفي وضع 'no-cors' لتجنب الخطأ الكاذب
             fetch(GOOGLE_SCRIPT_URL, { 
                 method: 'POST',
                 body: urlParams,
                 mode: 'no-cors' 
             });
 
-            // 🛑 تنفيذ كود النجاح مباشرة هنا، لضمان ظهور رسالة النجاح
-            const whatsappURL = buildWhatsappURL(allFields, coursesStringJoined, coursesString.length);
+            // 🛑 تنفيذ كود النجاح مباشرة (الحل 1-3)
+            const whatsappURL = buildWhatsappURL(allFields, coursesStringJoined, selectedTitles.length);
 
             let countdown = 3;
             const timer = setInterval(() => {
@@ -311,15 +329,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (countdown < 0) {
                     clearInterval(timer);
                     // تأخير بسيط لضمان اكتمال عملية الإرسال قبل التوجيه
-                    setTimeout(() => {
-                        window.location.href = whatsappURL;
-                    }, 1000); 
+                    if (whatsappURL) {
+                        setTimeout(() => window.location.href = whatsappURL, 1000); 
+                    } else {
+                        // في حال عدم وجود رقم واتساب، عرض رسالة نجاح نهائية
+                        submissionMessage.textContent = '✅ تم تسجيل بياناتك بنجاح! شكراً لك.';
+                    }
                 }
             }, 1000);
 
         } catch (error) {
-            // هذا الجزء لن يتم تنفيذه في وضع 'no-cors' في حال النجاح
-            console.error("حدث خطأ غير متوقع (لكن البيانات قد تكون وصلت فعلاً).", error);
+            // هذا الجزء سيتم تجاوزه في وضع 'no-cors' عند الإرسال الناجح
+            console.error("خطأ غير متوقع أثناء عملية الإرسال:", error);
             submissionMessage.classList.remove('status-success');
             submissionMessage.classList.add('status-error');
             submissionMessage.textContent = '❌ حدث خطأ غير متوقع. الرجاء المحاولة مرة أخرى.';
