@@ -2,7 +2,7 @@
 
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbweX983lj4xsTDLo6C64usEcnbFmLST2aQ4v79zjKgIv2v5zGAJERurt_eLXf58dZhtIw/exec'; 
 
-// Offer.js - منطق نموذج التسجيل للعروض الخاصة (الإصدار النهائي المستقر لـ CSV/PUBLISHED LINK)
+// Offer.js - منطق نموذج التسجيل للعروض الخاصة (الإصدار النهائي والمُصحَّح)
 
 document.addEventListener('DOMContentLoaded', () => {
     // 1. تحديد العناصر (Selectors)
@@ -74,7 +74,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // 3. معالجة بيانات CSV
             const rows = text.split('\n');
-            // نتأكد من وجود صف رؤوس وصف واحد للبيانات على الأقل
             if (rows.length < 2) {
                  coursesListContainer.innerHTML = '<p class="error-message status-error">⚠️ لم يتم العثور على بيانات في ورقة "بيانات_الدورات".</p>';
                  return;
@@ -186,12 +185,26 @@ document.addEventListener('DOMContentLoaded', () => {
         displayFieldError(input, message);
         return !message;
     };
+    
+    // 🛑 التعديل الأخير هنا: تم تبسيط عملية التحقق وتفعيل الزر
     const validateForm = () => {
         let isFormValid = true;
+        // 1. التحقق من الحقول الفردية
         form.querySelectorAll('[required]').forEach(input => {
             if (!validateField(input)) isFormValid = false;
         });
-        if (!updateSelectionStatus()) isFormValid = false;
+        // 2. التحقق من الدورات
+        if (!updateSelectionStatus(false)) isFormValid = false; 
+        
+        // تفعيل أو تعطيل الزر بناءً على صحة النموذج بالكامل
+        if (isFormValid) {
+            submitButton.classList.add('ready-to-submit');
+            submitButton.disabled = false;
+        } else {
+            submitButton.classList.remove('ready-to-submit');
+            submitButton.disabled = true;
+        }
+        
         return isFormValid;
     };
     
@@ -200,7 +213,9 @@ document.addEventListener('DOMContentLoaded', () => {
         e.target.closest('.course-item').classList.toggle('is-selected', e.target.checked);
         updateSelectionStatus();
     };
-    const updateSelectionStatus = () => {
+    
+    // 🛑 التعديل الأخير هنا: تم تبسيط عملية التحقق من حالة الاختيار
+    const updateSelectionStatus = (updateValidation = true) => {
         if (!courseCheckboxes) return false;
         const checkedCount = Array.from(courseCheckboxes).filter(cb => cb.checked).length;
         const coursesErrorElement = document.getElementById('coursesError');
@@ -215,17 +230,17 @@ document.addEventListener('DOMContentLoaded', () => {
             statusDisplay.textContent = message;
             coursesErrorElement.textContent = (checkedCount === 0) ? 'الرجاء اختيار دورتين على الأقل.' : `تحتاج لاختيار ${MIN_SELECTION - checkedCount} دورة إضافية.`;
             coursesErrorElement.style.display = 'block';
-            submitButton.classList.remove('ready-to-submit');
-            submitButton.disabled = true;
+            
+            // نطلب إعادة التحقق من الفورم بعد تغيير الاختيار
+            if (updateValidation) validateForm();
             return false;
         } else {
             statusDisplay.classList.remove('status-error');
             statusDisplay.classList.add('status-success');
             statusDisplay.textContent = `اختيار موفق! تم اختيار ${checkedCount} دورة. أكمل بيانات التسجيل وأرسلها.`;
-            if (validateForm()) {
-                submitButton.classList.add('ready-to-submit');
-                submitButton.disabled = false;
-            }
+            
+            // نطلب إعادة التحقق من الفورم بعد تغيير الاختيار
+            if (updateValidation) validateForm();
             return true;
         }
     };
@@ -233,6 +248,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 5. منطق الإرسال الرئيسي (Submission)
     form.addEventListener('submit', async function(e) {
         e.preventDefault(); 
+        // 🛑 نستخدم validateForm للتأكد من حالة الزر قبل الإرسال
         if (!validateForm()) return; 
 
         submitButton.textContent = 'جاري إرسال البيانات...';
@@ -293,9 +309,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // 6. تهيئة الصفحة
     form.querySelectorAll('[required]').forEach(input => {
-        input.addEventListener('input', () => validateField(input));
+        input.addEventListener('input', validateForm); // ربط التغيير في الحقول بالتحقق
         if (input.tagName.toLowerCase() === 'select') {
-            input.addEventListener('change', () => validateField(input));
+            input.addEventListener('change', validateForm); // ربط التغيير في القائمة المنسدلة بالتحقق
         }
     });
 
