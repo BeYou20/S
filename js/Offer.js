@@ -122,7 +122,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     const label = document.createElement('label');
                     label.classList.add('course-item');
                     label.innerHTML = `
-                        <input type="checkbox" name="courses_selected" value="${course.id}" aria-label="${course.title}">
+                        <input 
+                            type="checkbox" 
+                            name="courses_selected" 
+                            value="${course.id}" 
+                            aria-label="${course.title}"
+                            data-title="${course.title}" // 🛑 التعديل هنا: لإضافة اسم الدورة (Title)
+                        >
                         <span class="custom-checkbox"></span>
                         <span class="course-title"><i class="fa-solid fa-circle-check"></i> ${course.title}</span>
                         <span class="course-description">${course.heroDescription || ''}</span>
@@ -270,15 +276,17 @@ document.addEventListener('DOMContentLoaded', () => {
             'البلد': formData.get('البلد'), 
             'ملاحظات إضافية': formData.get('ملاحظات إضافية') || 'لا توجد',
         };
-        selectedCourseElements.forEach(checkbox => coursesString.push(checkbox.value));
+        
+        // 🛑 التعديل هنا: نستخدم dataset.title لجلب اسم الدورة بدلاً من checkbox.value (الـ ID)
+        selectedCourseElements.forEach(checkbox => coursesString.push(checkbox.dataset.title)); 
         const coursesStringJoined = coursesString.join('، '); 
 
         try {
             // الإرسال لجدول Google Sheet (عبر GOOGLE_SCRIPT_URL في url.js)
-            await fetch(GOOGLE_SCRIPT_URL, {
+            // 🛑 التعديل هنا: تم حذف mode: 'no-cors' لتجنب رسالة الخطأ الكاذبة
+            await fetch(GOOGLE_SCRIPT_URL, { 
                 method: 'POST',
                 body: urlParams,
-                mode: 'no-cors' 
             });
             
             const whatsappURL = buildWhatsappURL(allFields, coursesStringJoined, coursesString.length);
@@ -286,6 +294,8 @@ document.addEventListener('DOMContentLoaded', () => {
             let countdown = 3;
             const timer = setInterval(() => {
                 submissionMessage.textContent = `✅ تم تسجيل بياناتك بنجاح! جارٍ توجيهك خلال ${countdown}...`;
+                submissionMessage.classList.remove('status-error');
+                submissionMessage.classList.add('status-success');
                 submissionMessage.style.display = 'block';
                 countdown--;
                 if (countdown < 0) {
