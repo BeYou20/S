@@ -2,10 +2,8 @@
 
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbweX983lj4xsTDLo6C64usEcnbFmLST2aQ4v79zjKgIv2v5zGAJERurt_eLXf58dZhtIw/exec'; 
 
-// 🛑 الحل 1-2: تعريف المتغير INSTITUTION_WHATSAPP_NUMBER إذا لم يكن معرّفاً في مكان آخر
-// يرجى وضع رقم واتساب مؤسستك بالصيغة الدولية بدون (+) هنا:
-const INSTITUTION_WHATSAPP_NUMBER = window.INSTITUTION_WHATSAPP_NUMBER || '967700000000'; 
-// يمكنك استبدال '967700000000' برقم حقيقي.
+// 🛑 تحديث رقم الواتساب ورقم الهاتف (للتوجيه)
+const INSTITUTION_WHATSAPP_NUMBER = '967778185189'; 
 
 // Offer.js - منطق نموذج التسجيل للعروض الخاصة (الإصدار النهائي والمُصحَّح)
 
@@ -28,12 +26,16 @@ document.addEventListener('DOMContentLoaded', () => {
      * يبني رسالة الواتساب النهائية بعد نجاح الإرسال.
      */
     const buildWhatsappURL = (dataObj, coursesString, coursesCount) => {
-        // 🛑 الحل 1-1: جعل الدالة دفاعية للتحقق من وجود رقم الواتساب
-        const phone = (typeof INSTITUTION_WHATSAPP_NUMBER !== 'undefined') ? INSTITUTION_WHATSAPP_NUMBER : null;
+        // التحقق من وجود رقم الواتساب (لضمان عدم حدوث ReferenceError)
+        const phone = (typeof INSTITUTION_WHATSAPP_NUMBER !== 'undefined' && INSTITUTION_WHATSAPP_NUMBER) ? INSTITUTION_WHATSAPP_NUMBER : null;
         
         let messageBody = `مرحباً مؤسسة كن أنت، أرجو تأكيد اشتراكي في عرض VIP. هذه بيانات التسجيل المرسلة عبر النموذج:`;
 
-        for (const [key, value] of Object.entries(dataObj)) {
+        // إزالة الحقول المكررة للدورات من رسالة الواتساب وتجميعها في النهاية
+        const whatsappData = { ...dataObj };
+        delete whatsappData['courses_selected_titles']; 
+        
+        for (const [key, value] of Object.entries(whatsappData)) {
             messageBody += `\n* ${key}: ${value}`;
         }
         
@@ -43,7 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (!phone) {
              console.warn('INSTITUTION_WHATSAPP_NUMBER غير معرف أو فارغ. لن يتم إعادة التوجيه للواتساب.');
-             return null; // إرجاع قيمة فارغة لتجنب التوجيه غير الصحيح
+             return null;
         }
         
         return `https://wa.me/${phone}?text=${encodedMessage}`;
@@ -68,11 +70,9 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     const generateCoursesList = async () => {
         
-        // 1. تعريف المتغيرات باستخدام رابط النشر (الطريقة الأكثر استقراراً)
         const PUBLISHED_SHEET_ID = '2PACX-1vR0xJG_95MQb1Dwqzg0Ath0_5RIyqdEoHJIW35rBnW8qy17roXq7-xqyCPZmGx2n3e1aj4jY1zkbRa-';
-        const GID = '1511305260'; // معرّف تبويبة "بيانات_الدورات"
+        const GID = '1511305260'; 
 
-        // الرابط الجديد: جلب بيانات CSV (يتجنب مشاكل استعلامات SQL)
         const COURSES_API_URL = 
             `https://docs.google.com/spreadsheets/d/e/${PUBLISHED_SHEET_ID}/pub?gid=${GID}&single=true&output=csv`;
 
@@ -80,18 +80,15 @@ document.addEventListener('DOMContentLoaded', () => {
         submitButton.disabled = true;
 
         try {
-            // 2. الجلب من رابط CSV
             const response = await fetch(COURSES_API_URL); 
             const text = await response.text();
 
-            // 3. معالجة بيانات CSV
             const rows = text.split('\n');
             if (rows.length < 2) {
                  coursesListContainer.innerHTML = '<p class="error-message status-error">⚠️ لم يتم العثور على بيانات في ورقة "بيانات_الدورات".</p>';
                  return;
             }
 
-            // الصف الأول هو رؤوس الأعمدة
             const headers = rows[0].split(',').map(header => header.trim().replace(/"/g, ''));
             const requiredColumns = ['id', 'title', 'heroDescription', 'is_vip']; 
             
@@ -103,41 +100,36 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const coursesMatrix = [];
             for (let i = 1; i < rows.length; i++) {
-                // تقسيم حسب الفاصلة مع تجاهل الفواصل داخل علامات التنصيص
                 const rowValues = rows[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/); 
                 const course = {};
                 let is_vip_match = false;
                 
                 for (let j = 0; j < headers.length; j++) {
                     const colName = headers[j];
-                    // تنظيف القيمة من المسافات وعلامات التنصيص
                     let value = rowValues[j] ? rowValues[j].trim().replace(/"/g, '') : '';
                     
                     course[colName] = value;
                     
-                    // 🛑 الفلترة: نبحث عن 'Y' في عمود is_vip
                     if (colName === 'is_vip' && value === 'Y') {
                         is_vip_match = true;
                     }
                 }
                 
-                // 🛑 إضافة الدورة فقط إذا كانت VIP وصالحة
                 if (is_vip_match && course.id && course.title) {
                     coursesMatrix.push(course);
                 }
             }
             
-            // 6. توليد عناصر الـ Checkboxes
             coursesListContainer.innerHTML = '';
             if (coursesMatrix.length > 0) {
                 coursesMatrix.forEach(course => {
-                    // 🛑 الحل 3: استخدام DOM API لتوليد العناصر بدلاً من innerHTML string لتجنب مشاكل التعليقات
+                    // 🛑 استخدام DOM API لإنشاء العناصر بأمان
                     const label = document.createElement('label');
                     label.classList.add('course-item');
                     
                     const input = document.createElement('input');
                     input.type = 'checkbox';
-                    input.name = 'courses_selected_ids'; // 🛑 تغيير الاسم لجمع الـ IDs فقط
+                    input.name = 'courses_selected_ids'; // يبقى ID في القيمة
                     input.value = course.id; 
                     input.setAttribute('aria-label', course.title);
                     input.dataset.title = course.title; // تخزين العنوان بأمان
@@ -157,7 +149,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     coursesListContainer.appendChild(label);
                 });
                 
-                // 7. ربط الأحداث وتحديث الحالة
                 courseCheckboxes = coursesListContainer.querySelectorAll('input[type="checkbox"]');
                 courseCheckboxes.forEach(checkbox => {
                     checkbox.addEventListener('change', handleCourseChange);
@@ -174,8 +165,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
     
-    // 3. دوال التحقق المتقدم (Validation) 
-    
+    // ... (دوال التحقق والإدارة: validateField, validateForm, handleCourseChange, updateSelectionStatus تبقى كما هي بدون تغيير جوهري)
     const displayFieldError = (inputElement, message) => {
         const errorElement = document.getElementById(inputElement.id + 'Error');
         if (!errorElement) return;
@@ -215,14 +205,11 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const validateForm = () => {
         let isFormValid = true;
-        // 1. التحقق من الحقول الفردية
         form.querySelectorAll('[required]').forEach(input => {
             if (!validateField(input)) isFormValid = false;
         });
-        // 2. التحقق من الدورات
         if (!updateSelectionStatus(false)) isFormValid = false; 
         
-        // تفعيل أو تعطيل الزر بناءً على صحة النموذج بالكامل
         if (isFormValid) {
             submitButton.classList.add('ready-to-submit');
             submitButton.disabled = false;
@@ -234,7 +221,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return isFormValid;
     };
     
-    // 4. دوال التفاعل مع الدورات والحالة
     const handleCourseChange = (e) => {
         e.target.closest('.course-item').classList.toggle('is-selected', e.target.checked);
         updateSelectionStatus();
@@ -267,6 +253,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return true;
         }
     };
+
     
     // 5. منطق الإرسال الرئيسي (Submission)
     form.addEventListener('submit', async function(e) {
@@ -278,72 +265,69 @@ document.addEventListener('DOMContentLoaded', () => {
         loadingIndicator.style.display = 'flex'; 
         submissionMessage.style.display = 'none';
 
-        // 🛑 الحل 2: بناء URLSearchParams يدوياً لإضافة عناوين الدورات
-        const formData = new FormData(this);
         const selectedCbs = Array.from(courseCheckboxes).filter(cb => cb.checked);
-        
-        // جمع ids وعناوين الدورات
         const selectedIds = selectedCbs.map(cb => cb.value);
         const selectedTitles = selectedCbs.map(cb => cb.dataset.title || cb.getAttribute('aria-label') || cb.value);
         const coursesStringJoined = selectedTitles.join('، '); 
 
-        // بناء URLSearchParams نظيف
-        const urlParams = new URLSearchParams();
-        for (const [k, v] of formData.entries()) {
-            if (k === 'courses_selected_ids') continue; // تجاوز حقل الـ IDs الذي تم تعريفه في الـ input
-            urlParams.append(k, v);
-        }
-        // إضافة الحقول المجمعة الجديدة لـ Google Sheet
-        urlParams.append('courses_selected_ids', selectedIds.join('، ')); 
-        urlParams.append('courses_selected_titles', coursesStringJoined); // إرسال العناوين
-
+        // 🛑 بناء الـ allFields بشكل صحيح مع دمج أسماء الدورات
         const allFields = {
-            'الاسم الكامل': formData.get('الاسم الكامل'),
-            'البريد الإلكتروني': formData.get('البريد الإلكتروني'),
-            'رقم الهاتف': formData.get('رقم الهاتف'),
-            'العمر': formData.get('العمر'),
-            'الجنس': formData.get('الجنس'),
-            'البلد': formData.get('البلد'), 
-            'ملاحظات إضافية': formData.get('ملاحظات إضافية') || 'لا توجد',
+            'الاسم الكامل': document.getElementById('الاسم الكامل').value.trim(),
+            'البريد الإلكتروني': document.getElementById('email').value.trim(),
+            'رقم الهاتف': document.getElementById('phone').value.trim(),
+            'العمر': document.getElementById('age').value.trim(),
+            'الجنس': document.getElementById('الجنس').value,
+            'البلد': document.getElementById('country').value, 
+            'ملاحظات إضافية': document.getElementById('ملاحظات إضافية').value.trim() || 'لا توجد',
+            // 🛑 إضافة أسماء الدورات لترسل إلى الشيت
+            'الدورات المختارة (عناوين)': coursesStringJoined, 
+            'الدورات المختارة (IDs)': selectedIds.join('، '),
         };
 
+        // 🛑 اعتماد طريقة الإرسال الجديدة (مع response.json)
+        const urlParams = new URLSearchParams(Object.entries(allFields));
+
         try {
-            // الإرسال لجدول Google Sheet 
-            // 🛑 استخدام fetch بدون await وفي وضع 'no-cors' لتجنب الخطأ الكاذب
-            fetch(GOOGLE_SCRIPT_URL, { 
+            const response = await fetch(GOOGLE_SCRIPT_URL, {
                 method: 'POST',
-                body: urlParams,
-                mode: 'no-cors' 
+                body: urlParams
+                // يجب تفعيل CORS في Google Script لكي لا يفشل هنا
             });
 
-            // 🛑 تنفيذ كود النجاح مباشرة (الحل 1-3)
-            const whatsappURL = buildWhatsappURL(allFields, coursesStringJoined, selectedTitles.length);
+            // قراءة النتيجة كـ JSON (ستنجح فقط إذا كان CORS مفعلاً والاستجابة JSON)
+            const result = await response.json(); 
 
-            let countdown = 3;
-            const timer = setInterval(() => {
-                submissionMessage.textContent = `✅ تم تسجيل بياناتك بنجاح! جارٍ توجيهك خلال ${countdown}...`;
-                submissionMessage.classList.remove('status-error');
-                submissionMessage.classList.add('status-success');
-                submissionMessage.style.display = 'block';
-                countdown--;
-                if (countdown < 0) {
-                    clearInterval(timer);
-                    // تأخير بسيط لضمان اكتمال عملية الإرسال قبل التوجيه
-                    if (whatsappURL) {
-                        setTimeout(() => window.location.href = whatsappURL, 1000); 
-                    } else {
-                        // في حال عدم وجود رقم واتساب، عرض رسالة نجاح نهائية
-                        submissionMessage.textContent = '✅ تم تسجيل بياناتك بنجاح! شكراً لك.';
+            if (response.ok && result && result.status === 'success') {
+                // 🛑 تنفيذ العد التنازلي (الذي طلبته)
+                const whatsappURL = buildWhatsappURL(allFields, coursesStringJoined, selectedTitles.length);
+
+                let countdown = 3;
+                const timer = setInterval(() => {
+                    submissionMessage.textContent = `✅ تم تسجيل بياناتك بنجاح! جارٍ توجيهك إلى واتساب خلال ${countdown}...`;
+                    submissionMessage.classList.remove('status-error');
+                    submissionMessage.classList.add('status-success');
+                    submissionMessage.style.display = 'block';
+                    countdown--;
+                    if (countdown < 0) {
+                        clearInterval(timer);
+                        if (whatsappURL) {
+                            window.location.href = whatsappURL;
+                        } else {
+                             submissionMessage.textContent = '✅ تم تسجيل بياناتك بنجاح! لم يتم التوجيه لواتساب (لم يتم تعريف الرقم).';
+                             submitButton.textContent = 'تم التسجيل بنجاح';
+                        }
                     }
-                }
-            }, 1000);
+                }, 1000);
+            } else {
+                // فشل الإرسال (حقيقي أو بسبب عدم تفعيل CORS)
+                throw new Error(result ? result.message : 'فشل الاتصال بالخادم. (قد تحتاج لتفعيل CORS).');
+            }
 
         } catch (error) {
-            // هذا الجزء سيتم تجاوزه في وضع 'no-cors' عند الإرسال الناجح
-            console.error("خطأ غير متوقع أثناء عملية الإرسال:", error);
+            console.error('فشل الإرسال النهائي:', error);
             submissionMessage.classList.remove('status-success');
             submissionMessage.classList.add('status-error');
-            submissionMessage.textContent = '❌ حدث خطأ غير متوقع. الرجاء المحاولة مرة أخرى.';
+            submissionMessage.textContent = '❌ حدث خطأ أثناء إرسال البيانات. الرجاء المحاولة مرة أخرى. (التفاصيل: ' + error.message + ')';
             submissionMessage.style.display = 'block';
             submitButton.textContent = 'إرسال التسجيل الآن';
             submitButton.disabled = false;
@@ -355,9 +339,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // 6. تهيئة الصفحة
     form.querySelectorAll('[required]').forEach(input => {
-        input.addEventListener('input', validateForm); // ربط التغيير في الحقول بالتحقق
+        input.addEventListener('input', validateForm); 
         if (input.tagName.toLowerCase() === 'select') {
-            input.addEventListener('change', validateForm); // ربط التغيير في القائمة المنسدلة بالتحقق
+            input.addEventListener('change', validateForm); 
         }
     });
 
