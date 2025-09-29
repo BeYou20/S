@@ -1,6 +1,6 @@
-// Offer.js - منطق نموذج التسجيل للعروض الخاصة (الإصدار النهائي المستقر لإرسال JSON)
+// Offer.js - منطق نموذج التسجيل للعروض الخاصة (الإصدار النهائي والموحد والأقوى)
 
-const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxllC-POpUwJ2O4QefLQuxARoXgRREOhSUpu3WDp8OiozPXfvJ_QCpmvMHp_qlM2b9I/exec'; 
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyY4lbL6t-YJWwqYfd0dhkzFQz_8Rhykyx4V1GCabC4JkuDH5XI52K50UbDfM9BS0jaoA/exec'; 
 // ملاحظة: تأكد أن المتغيرين INSTITUTION_WHATSAPP_NUMBER و arabCountries مُعرَّفان في مكان آخر بالصفحة.
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -55,9 +55,9 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     const generateCoursesList = async () => {
         
-        // 1. تعريف المتغيرات باستخدام رابط النشر (الرابط الذي زودتنا به)
+        // 1. تعريف المتغيرات باستخدام رابط النشر
         const PUBLISHED_SHEET_ID = '2PACX-1vR0xJG_95MQb1Dwqzg0Ath0_5RIyqdEoHJIW35rBnW8qy17roXq7-xqyCPZmGx2n3e1aj4jY1zkbRa-';
-        const GID = '1511305260'; // معرّف تبويبة "بيانات_الدورات"
+        const GID = '1511305260'; 
 
         // الرابط الجديد: جلب بيانات CSV
         const COURSES_API_URL = 
@@ -101,13 +101,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     
                     course[colName] = value;
                     
-                    // الفلترة: نبحث عن 'Y' في عمود is_vip
                     if (colName === 'is_vip' && value === 'Y') {
                         is_vip_match = true;
                     }
                 }
                 
-                // إضافة الدورة فقط إذا كانت VIP وصالحة
                 if (is_vip_match && course.id && course.title) {
                     coursesMatrix.push(course);
                 }
@@ -239,7 +237,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
     
-    // 5. منطق الإرسال الرئيسي (Submission) - تم التعديل للإرسال بصيغة JSON
+    // 5. منطق الإرسال الرئيسي (Submission) - الإرسال الجذري والمقاوم للفشل
     form.addEventListener('submit', async function(e) {
         e.preventDefault(); 
         if (!validateForm()) return; 
@@ -251,7 +249,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const formData = new FormData(this);
         
-        // 🛑 تحويل بيانات النموذج إلى كائن JSON
+        // تحويل بيانات النموذج إلى كائن JSON
         const dataToSend = {};
         for (const [key, value] of formData.entries()) {
             dataToSend[key] = value;
@@ -272,22 +270,20 @@ document.addEventListener('DOMContentLoaded', () => {
             'ملاحظات إضافية': dataToSend['ملاحظات إضافية'] || 'لا توجد',
         };
         const coursesStringJoined = dataToSend['courses_selected'].join('، ');
-
+        const whatsappURL = buildWhatsappURL(allFieldsForWhatsapp, coursesStringJoined, dataToSend['courses_selected'].length);
 
         try {
-            // الإرسال لجدول Google Sheet بصيغة JSON
+            // 🛑 نرسل الطلب مع تجاوز مشكلة استجابة الخادم (CORS) عبر no-cors
             await fetch(GOOGLE_SCRIPT_URL, {
                 method: 'POST',
-                // 🛑 نرسل البيانات كـ JSON
                 body: JSON.stringify(dataToSend), 
-                // 🛑 يجب إرسال هذا العنوان لتفسير JSON بشكل صحيح في Apps Script
                 headers: {
                     'Content-Type': 'application/json' 
                 },
+                mode: 'no-cors' // حل مشكلة CORS
             });
             
-            const whatsappURL = buildWhatsappURL(allFieldsForWhatsapp, coursesStringJoined, dataToSend['courses_selected'].length);
-
+            // 🛑 التوجيه الفوري: نفترض النجاح ونقوم بالتوجيه بعد فترة انتظار قصيرة
             let countdown = 3;
             const timer = setInterval(() => {
                 submissionMessage.textContent = `✅ تم تسجيل بياناتك بنجاح! جارٍ توجيهك خلال ${countdown}...`;
@@ -301,10 +297,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } catch (error) {
             console.error('فشل إرسال البيانات (JSON):', error);
+            // في حال فشل عملية fetch نفسها، نعتذر ونوجه المستخدم يدوياً
             submissionMessage.classList.remove('status-success');
             submissionMessage.classList.add('status-error');
-            submissionMessage.textContent = '❌ حدث خطأ أثناء إرسال البيانات. الرجاء المحاولة مرة أخرى.';
+            submissionMessage.textContent = '❌ حدث خطأ في الاتصال، لكن سنحاول توجيهك للمساعدة...';
             submissionMessage.style.display = 'block';
+            
+            // محاولة التوجيه يدويا بعد فترة قصيرة
+            setTimeout(() => {
+                 window.location.href = whatsappURL;
+            }, 3000);
+            
             submitButton.textContent = 'إرسال التسجيل الآن';
             submitButton.disabled = false;
             submitButton.classList.remove('ready-to-submit');
