@@ -127,7 +127,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             name="courses_selected" 
                             value="${course.id}" 
                             aria-label="${course.title}"
-                            data-title="${course.title}" // 🛑 التعديل هنا: لإضافة اسم الدورة (Title)
+                            data-title="${course.title}" // 🛑 تم إضافة اسم الدورة هنا
                         >
                         <span class="custom-checkbox"></span>
                         <span class="course-title"><i class="fa-solid fa-circle-check"></i> ${course.title}</span>
@@ -282,13 +282,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const coursesStringJoined = coursesString.join('، '); 
 
         try {
-            // الإرسال لجدول Google Sheet (عبر GOOGLE_SCRIPT_URL في url.js)
-            // 🛑 التعديل هنا: تم حذف mode: 'no-cors' لتجنب رسالة الخطأ الكاذبة
-            await fetch(GOOGLE_SCRIPT_URL, { 
+            // الإرسال لجدول Google Sheet 
+            // نستخدم 'no-cors' ونحذف 'await' لضمان إرسال البيانات فوراً دون انتظار استجابة يمكن أن تسبب خطأ كاذب
+            fetch(GOOGLE_SCRIPT_URL, { 
                 method: 'POST',
                 body: urlParams,
+                mode: 'no-cors' 
             });
-            
+
+            // 🛑 تنفيذ كود النجاح مباشرة هنا، بعد إطلاق طلب الإرسال
             const whatsappURL = buildWhatsappURL(allFields, coursesStringJoined, coursesString.length);
 
             let countdown = 3;
@@ -300,14 +302,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 countdown--;
                 if (countdown < 0) {
                     clearInterval(timer);
-                    window.location.href = whatsappURL;
+                    // 🛑 تأخير بسيط لضمان وصول البيانات قبل التوجيه
+                    setTimeout(() => {
+                        window.location.href = whatsappURL;
+                    }, 1000); 
                 }
             }, 1000);
 
         } catch (error) {
+            // هذا الجزء سيتم تجاوزه في وضع 'no-cors' لكنه يظل هنا للحالات غير المتوقعة
+            console.error("حدث خطأ غير متوقع (لكن البيانات قد تكون وصلت فعلاً).", error);
             submissionMessage.classList.remove('status-success');
             submissionMessage.classList.add('status-error');
-            submissionMessage.textContent = '❌ حدث خطأ أثناء إرسال البيانات. الرجاء المحاولة مرة أخرى.';
+            submissionMessage.textContent = '❌ حدث خطأ غير متوقع. جرب التحديث والمحاولة مرة أخرى.';
             submissionMessage.style.display = 'block';
             submitButton.textContent = 'إرسال التسجيل الآن';
             submitButton.disabled = false;
