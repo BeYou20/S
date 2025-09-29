@@ -1,7 +1,8 @@
-// Offer.js - منطق نموذج التسجيل للعروض الخاصة (الإصدار النهائي والموحد والأقوى)
+// Offer.js - الإصدار النهائي الموحد والأكثر موثوقية (URLSearchParams)
 
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbweX983lj4xsTDLo6C64usEcnbFmLST2aQ4v79zjKgIv2v5zGAJERurt_eLXf58dZhtIw/exec'; 
-// ملاحظة: تأكد أن المتغيرين INSTITUTION_WHATSAPP_NUMBER و arabCountries مُعرَّفان في مكان آخر بالصفحة.
+
+// Offer.js - منطق نموذج التسجيل للعروض الخاصة (الإصدار النهائي المستقر لـ CSV/PUBLISHED LINK)
 
 document.addEventListener('DOMContentLoaded', () => {
     // 1. تحديد العناصر (Selectors)
@@ -37,7 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     /**
-     * يملأ القائمة المنسدلة للبلدان.
+     * يملأ القائمة المنسدلة للبلدان (يفترض وجود مصفوفة arabCountries معرفة في ملف آخر).
      */
     const populateCountries = () => {
         if (typeof arabCountries !== 'undefined' && Array.isArray(arabCountries)) {
@@ -55,11 +56,11 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     const generateCoursesList = async () => {
         
-        // 1. تعريف المتغيرات باستخدام رابط النشر
+        // 1. تعريف المتغيرات باستخدام رابط النشر (الطريقة الأكثر استقراراً)
         const PUBLISHED_SHEET_ID = '2PACX-1vR0xJG_95MQb1Dwqzg0Ath0_5RIyqdEoHJIW35rBnW8qy17roXq7-xqyCPZmGx2n3e1aj4jY1zkbRa-';
-        const GID = '1511305260'; 
+        const GID = '1511305260'; // معرّف تبويبة "بيانات_الدورات"
 
-        // الرابط الجديد: جلب بيانات CSV
+        // الرابط الجديد: جلب بيانات CSV (يتجنب مشاكل استعلامات SQL)
         const COURSES_API_URL = 
             `https://docs.google.com/spreadsheets/d/e/${PUBLISHED_SHEET_ID}/pub?gid=${GID}&single=true&output=csv`;
 
@@ -73,6 +74,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // 3. معالجة بيانات CSV
             const rows = text.split('\n');
+            // نتأكد من وجود صف رؤوس وصف واحد للبيانات على الأقل
             if (rows.length < 2) {
                  coursesListContainer.innerHTML = '<p class="error-message status-error">⚠️ لم يتم العثور على بيانات في ورقة "بيانات_الدورات".</p>';
                  return;
@@ -97,15 +99,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 for (let j = 0; j < headers.length; j++) {
                     const colName = headers[j];
+                    // تنظيف القيمة من المسافات وعلامات التنصيص
                     let value = rowValues[j] ? rowValues[j].trim().replace(/"/g, '') : '';
                     
                     course[colName] = value;
                     
+                    // 🛑 الفلترة: نبحث عن 'Y' في عمود is_vip
                     if (colName === 'is_vip' && value === 'Y') {
                         is_vip_match = true;
                     }
                 }
                 
+                // 🛑 إضافة الدورة فقط إذا كانت VIP وصالحة
                 if (is_vip_match && course.id && course.title) {
                     coursesMatrix.push(course);
                 }
@@ -181,25 +186,12 @@ document.addEventListener('DOMContentLoaded', () => {
         displayFieldError(input, message);
         return !message;
     };
-    
     const validateForm = () => {
         let isFormValid = true;
-        // 1. التحقق من الحقول الفردية
         form.querySelectorAll('[required]').forEach(input => {
             if (!validateField(input)) isFormValid = false;
         });
-        // 2. التحقق من الدورات
-        if (!updateSelectionStatus(false)) isFormValid = false; 
-        
-        // تفعيل أو تعطيل الزر بناءً على صحة النموذج بالكامل
-        if (isFormValid) {
-            submitButton.classList.add('ready-to-submit');
-            submitButton.disabled = false;
-        } else {
-            submitButton.classList.remove('ready-to-submit');
-            submitButton.disabled = true;
-        }
-        
+        if (!updateSelectionStatus()) isFormValid = false;
         return isFormValid;
     };
     
@@ -208,8 +200,7 @@ document.addEventListener('DOMContentLoaded', () => {
         e.target.closest('.course-item').classList.toggle('is-selected', e.target.checked);
         updateSelectionStatus();
     };
-    
-    const updateSelectionStatus = (updateValidation = true) => {
+    const updateSelectionStatus = () => {
         if (!courseCheckboxes) return false;
         const checkedCount = Array.from(courseCheckboxes).filter(cb => cb.checked).length;
         const coursesErrorElement = document.getElementById('coursesError');
@@ -224,20 +215,22 @@ document.addEventListener('DOMContentLoaded', () => {
             statusDisplay.textContent = message;
             coursesErrorElement.textContent = (checkedCount === 0) ? 'الرجاء اختيار دورتين على الأقل.' : `تحتاج لاختيار ${MIN_SELECTION - checkedCount} دورة إضافية.`;
             coursesErrorElement.style.display = 'block';
-            
-            if (updateValidation) validateForm();
+            submitButton.classList.remove('ready-to-submit');
+            submitButton.disabled = true;
             return false;
         } else {
             statusDisplay.classList.remove('status-error');
             statusDisplay.classList.add('status-success');
             statusDisplay.textContent = `اختيار موفق! تم اختيار ${checkedCount} دورة. أكمل بيانات التسجيل وأرسلها.`;
-            
-            if (updateValidation) validateForm();
+            if (validateForm()) {
+                submitButton.classList.add('ready-to-submit');
+                submitButton.disabled = false;
+            }
             return true;
         }
     };
     
-    // 5. منطق الإرسال الرئيسي (Submission) - الإرسال الجذري والمقاوم للفشل
+    // 5. منطق الإرسال الرئيسي (Submission)
     form.addEventListener('submit', async function(e) {
         e.preventDefault(); 
         if (!validateForm()) return; 
@@ -248,42 +241,32 @@ document.addEventListener('DOMContentLoaded', () => {
         submissionMessage.style.display = 'none';
 
         const formData = new FormData(this);
-        
-        // تحويل بيانات النموذج إلى كائن JSON
-        const dataToSend = {};
-        for (const [key, value] of formData.entries()) {
-            dataToSend[key] = value;
-        }
-        
-        // معالجة Checkboxes المنفصلة
+        const urlParams = new URLSearchParams(formData); 
         const selectedCourseElements = Array.from(courseCheckboxes).filter(cb => cb.checked);
-        dataToSend['courses_selected'] = selectedCourseElements.map(cb => cb.value);
-
-        // بناء رسالة الواتساب الآن
-        const allFieldsForWhatsapp = {
-            'الاسم الكامل': dataToSend['الاسم الكامل'],
-            'البريد الإلكتروني': dataToSend['البريد الإلكتروني'],
-            'رقم الهاتف': dataToSend['رقم الهاتف'],
-            'العمر': dataToSend['العمر'],
-            'الجنس': dataToSend['الجنس'],
-            'البلد': dataToSend['البلد'], 
-            'ملاحظات إضافية': dataToSend['ملاحظات إضافية'] || 'لا توجد',
+        const coursesString = [];
+        
+        const allFields = {
+            'الاسم الكامل': formData.get('الاسم الكامل'),
+            'البريد الإلكتروني': formData.get('البريد الإلكتروني'),
+            'رقم الهاتف': formData.get('رقم الهاتف'),
+            'العمر': formData.get('العمر'),
+            'الجنس': formData.get('الجنس'),
+            'البلد': formData.get('البلد'), 
+            'ملاحظات إضافية': formData.get('ملاحظات إضافية') || 'لا توجد',
         };
-        const coursesStringJoined = dataToSend['courses_selected'].join('، ');
-        const whatsappURL = buildWhatsappURL(allFieldsForWhatsapp, coursesStringJoined, dataToSend['courses_selected'].length);
+        selectedCourseElements.forEach(checkbox => coursesString.push(checkbox.value));
+        const coursesStringJoined = coursesString.join('، '); 
 
         try {
-            // 🛑 نرسل الطلب مع تجاوز مشكلة استجابة الخادم (CORS) عبر no-cors
+            // الإرسال لجدول Google Sheet (عبر GOOGLE_SCRIPT_URL في url.js)
             await fetch(GOOGLE_SCRIPT_URL, {
                 method: 'POST',
-                body: JSON.stringify(dataToSend), 
-                headers: {
-                    'Content-Type': 'application/json' 
-                },
-                mode: 'no-cors' // حل مشكلة CORS
+                body: urlParams,
+                mode: 'no-cors' 
             });
             
-            // 🛑 التوجيه الفوري: نفترض النجاح ونقوم بالتوجيه بعد فترة انتظار قصيرة
+            const whatsappURL = buildWhatsappURL(allFields, coursesStringJoined, coursesString.length);
+
             let countdown = 3;
             const timer = setInterval(() => {
                 submissionMessage.textContent = `✅ تم تسجيل بياناتك بنجاح! جارٍ توجيهك خلال ${countdown}...`;
@@ -296,18 +279,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }, 1000);
 
         } catch (error) {
-            console.error('فشل إرسال البيانات (JSON):', error);
-            // في حال فشل عملية fetch نفسها، نعتذر ونوجه المستخدم يدوياً
             submissionMessage.classList.remove('status-success');
             submissionMessage.classList.add('status-error');
-            submissionMessage.textContent = '❌ حدث خطأ في الاتصال، لكن سنحاول توجيهك للمساعدة...';
+            submissionMessage.textContent = '❌ حدث خطأ أثناء إرسال البيانات. الرجاء المحاولة مرة أخرى.';
             submissionMessage.style.display = 'block';
-            
-            // محاولة التوجيه يدويا بعد فترة قصيرة
-            setTimeout(() => {
-                 window.location.href = whatsappURL;
-            }, 3000);
-            
             submitButton.textContent = 'إرسال التسجيل الآن';
             submitButton.disabled = false;
             submitButton.classList.remove('ready-to-submit');
@@ -318,9 +293,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // 6. تهيئة الصفحة
     form.querySelectorAll('[required]').forEach(input => {
-        input.addEventListener('input', validateForm); 
+        input.addEventListener('input', () => validateField(input));
         if (input.tagName.toLowerCase() === 'select') {
-            input.addEventListener('change', validateForm); 
+            input.addEventListener('change', () => validateField(input));
         }
     });
 
