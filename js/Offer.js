@@ -22,16 +22,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 2. دوال مساعدة وإدارية
 
-    /**
-     * يبني رسالة الواتساب النهائية بعد نجاح الإرسال.
-     */
     const buildWhatsappURL = (dataObj, coursesString, coursesCount) => {
-        // التحقق من وجود رقم الواتساب (لضمان عدم حدوث ReferenceError)
         const phone = (typeof INSTITUTION_WHATSAPP_NUMBER !== 'undefined' && INSTITUTION_WHATSAPP_NUMBER) ? INSTITUTION_WHATSAPP_NUMBER : null;
         
         let messageBody = `مرحباً مؤسسة كن أنت، أرجو تأكيد اشتراكي في عرض VIP. هذه بيانات التسجيل المرسلة عبر النموذج:`;
 
-        // إزالة الحقول المكررة للدورات من رسالة الواتساب وتجميعها في النهاية
         const whatsappData = { ...dataObj };
         delete whatsappData['courses_selected_titles']; 
         
@@ -51,9 +46,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return `https://wa.me/${phone}?text=${encodedMessage}`;
     };
 
-    /**
-     * يملأ القائمة المنسدلة للبلدان (يفترض وجود مصفوفة arabCountries معرفة في ملف آخر).
-     */
     const populateCountries = () => {
         if (typeof arabCountries !== 'undefined' && Array.isArray(arabCountries)) {
             arabCountries.forEach(country => {
@@ -65,11 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    /**
-     * يجلب قائمة الدورات من Google Sheet ويولد عناصر HTML.
-     */
     const generateCoursesList = async () => {
-        
         const PUBLISHED_SHEET_ID = '2PACX-1vR0xJG_95MQb1Dwqzg0Ath0_5RIyqdEoHJIW35rBnW8qy17roXq7-xqyCPZmGx2n3e1aj4jY1zkbRa-';
         const GID = '1511305260'; 
 
@@ -123,16 +111,15 @@ document.addEventListener('DOMContentLoaded', () => {
             coursesListContainer.innerHTML = '';
             if (coursesMatrix.length > 0) {
                 coursesMatrix.forEach(course => {
-                    // 🛑 استخدام DOM API لإنشاء العناصر بأمان
                     const label = document.createElement('label');
                     label.classList.add('course-item');
                     
                     const input = document.createElement('input');
                     input.type = 'checkbox';
-                    input.name = 'courses_selected_ids'; // يبقى ID في القيمة
+                    input.name = 'courses_selected'; // تم تغيير المفتاح ليطابق Google Script
                     input.value = course.id; 
                     input.setAttribute('aria-label', course.title);
-                    input.dataset.title = course.title; // تخزين العنوان بأمان
+                    input.dataset.title = course.title;
 
                     const spanCheckbox = document.createElement('span');
                     spanCheckbox.className = 'custom-checkbox';
@@ -165,7 +152,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
     
-    // ... (دوال التحقق والإدارة: validateField, validateForm, handleCourseChange, updateSelectionStatus تبقى كما هي بدون تغيير جوهري)
     const displayFieldError = (inputElement, message) => {
         const errorElement = document.getElementById(inputElement.id + 'Error');
         if (!errorElement) return;
@@ -190,7 +176,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) message = 'يرجى إدخال بريد إلكتروني صحيح.';
                     break;
                 case 'phone':
-                    const phoneSanitized = value.replace(/[\s\-\(\)]/g, '');
+                    const phoneSanitized = value.replace(/[\s\-]/g, '');
                     if (phoneSanitized.length > 0 && phoneSanitized.length < 8) message = 'يرجى إدخال رقم هاتف لا يقل عن 8 أرقام.';
                     break;
                 case 'age':
@@ -239,7 +225,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 ? 'يجب اختيار دورتين على الأقل. لم يتم اختيار أي دورة حتى الآن.'
                 : `يجب اختيار دورتين على الأقل. اختر ${MIN_SELECTION - checkedCount} دورة إضافية.`;
             statusDisplay.textContent = message;
-            coursesErrorElement.textContent = (checkedCount === 0) ? 'الرجاء اختيار دورتين على الأقل.' : `تحتاج لاختيار ${MIN_SELECTION - checkedCount} دورة إضافية.`;
+           coursesErrorElement.textContent = (checkedCount === 0) ? 'الرجاء اختيار دورتين على الأقل.' : `تحتاج لاختيار ${MIN_SELECTION - checkedCount} دورة إضافية.`;
             coursesErrorElement.style.display = 'block';
             
             if (updateValidation) validateForm();
@@ -254,7 +240,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    
     // 5. منطق الإرسال الرئيسي (Submission)
     form.addEventListener('submit', async function(e) {
         e.preventDefault(); 
@@ -279,26 +264,29 @@ document.addEventListener('DOMContentLoaded', () => {
             'الجنس': document.getElementById('الجنس').value,
             'البلد': document.getElementById('country').value, 
             'ملاحظات إضافية': document.getElementById('ملاحظات إضافية').value.trim() || 'لا توجد',
-            // 🛑 إضافة أسماء الدورات لترسل إلى الشيت
-            'الدورات المختارة (عناوين)': coursesStringJoined, 
-            'الدورات المختارة (IDs)': selectedIds.join('، '),
+            // 🛑 إرسال أسماء الدورات وليس فقط IDs
+            'courses_selected': selectedTitles, 
         };
 
-        // 🛑 اعتماد طريقة الإرسال الجديدة (مع response.json)
-        const urlParams = new URLSearchParams(Object.entries(allFields));
+        const urlParams = new URLSearchParams();
+        // دعم إرسال المصفوفة بشكل صحيح
+        Object.entries(allFields).forEach(([key, value]) => {
+            if (Array.isArray(value)) {
+                value.forEach(v => urlParams.append(key, v));
+            } else {
+                urlParams.append(key, value);
+            }
+        });
 
         try {
             const response = await fetch(GOOGLE_SCRIPT_URL, {
                 method: 'POST',
                 body: urlParams
-                // يجب تفعيل CORS في Google Script لكي لا يفشل هنا
             });
 
-            // قراءة النتيجة كـ JSON (ستنجح فقط إذا كان CORS مفعلاً والاستجابة JSON)
             const result = await response.json(); 
 
-            if (response.ok && result && result.status === 'success') {
-                // 🛑 تنفيذ العد التنازلي (الذي طلبته)
+            if (response.ok && result && result.success) {
                 const whatsappURL = buildWhatsappURL(allFields, coursesStringJoined, selectedTitles.length);
 
                 let countdown = 3;
@@ -319,8 +307,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }, 1000);
             } else {
-                // فشل الإرسال (حقيقي أو بسبب عدم تفعيل CORS)
-                throw new Error(result ? result.message : 'فشل الاتصال بالخادم. (قد تحتاج لتفعيل CORS).');
+                throw new Error(result ? result.message : 'فشل الاتصال بالخادم.');
             }
 
         } catch (error) {
