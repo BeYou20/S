@@ -1,9 +1,8 @@
-// Offer.js - الإصدار النهائي الموحد والأكثر موثوقية (الحل الجذري لمشكلة المؤشر)
+// Offer.js - الإصدار النهائي الموحد والأكثر موثوقية (URLSearchParams)
 
-// **ملاحظة: يجب تعريف GOOGLE_SCRIPT_URL و INSTITUTION_WHATSAPP_NUMBER
-// إما في ملف مستقل يتم تحميله قبل هذا الملف، أو تعريفهما هنا مباشرة.**
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbweX983lj4xsTDLo6C64usEcnbFmLST2aQ4v79zjKgIv2v5zGAJERurt_eLXf58dZhtIw/exec'; 
-const INSTITUTION_WHATSAPP_NUMBER = '966500000000'; // مثال: رقم الواتساب الخاص بك
+
+// Offer.js - منطق نموذج التسجيل للعروض الخاصة (الإصدار النهائي والمُصحَّح)
 
 document.addEventListener('DOMContentLoaded', () => {
     // 1. تحديد العناصر (Selectors)
@@ -28,9 +27,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const logDebugMessage = (message, isError = false) => {
         if (!serverDebugLog) return;
         const timestamp = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const className = isError ? 'log-error' : 'log-info';
         
         // إنشاء عنصر لـ p لرسالة جديدة
         const p = document.createElement('p');
+        p.classList.add(className);
         p.style.margin = '5px 0';
         p.style.color = isError ? '#a00' : '#005a00';
         p.style.borderBottom = isError ? '1px dashed #fcc' : 'none';
@@ -61,6 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const encodedMessage = encodeURIComponent(messageBody);
         
+        // يعتمد على المتغير INSTITUTION_WHATSAPP_NUMBER المُعرّف في ملف url.js
         return `https://wa.me/${INSTITUTION_WHATSAPP_NUMBER}?text=${encodedMessage}`;
     };
 
@@ -68,8 +70,6 @@ document.addEventListener('DOMContentLoaded', () => {
      * يملأ القائمة المنسدلة للبلدان (يفترض وجود مصفوفة arabCountries معرفة في ملف آخر).
      */
     const populateCountries = () => {
-        // يجب أن تكون مصفوفة البلدان العربية (arabCountries) معرفة مسبقاً في ملف آخر أو هنا
-        const arabCountries = ["السعودية", "الإمارات", "الكويت", "قطر", "البحرين", "عمان", "الأردن", "لبنان", "مصر", "المغرب", "تونس", "الجزائر", "العراق", "اليمن", "ليبيا", "فلسطين", "سوريا", "السودان", "جيبوتي", "موريتانيا", "الصومال", "جزر القمر"];
         if (typeof arabCountries !== 'undefined' && Array.isArray(arabCountries)) {
             arabCountries.forEach(country => {
                 const option = document.createElement('option');
@@ -223,7 +223,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return !message;
     };
     
-    // 🛑 تحديث: تبسيط عملية التحقق وتفعيل الزر
+    // 🛑 التعديل الأخير هنا: تم تبسيط عملية التحقق وتفعيل الزر
     const validateForm = () => {
         let isFormValid = true;
         // 1. التحقق من الحقول الفردية
@@ -251,7 +251,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updateSelectionStatus();
     };
     
-    // 🛑 تحديث: تبسيط عملية التحقق من حالة الاختيار
+    // 🛑 التعديل الأخير هنا: تم تبسيط عملية التحقق من حالة الاختيار
     const updateSelectionStatus = (updateValidation = true) => {
         if (!courseCheckboxes) return false;
         const checkedCount = Array.from(courseCheckboxes).filter(cb => cb.checked).length;
@@ -290,7 +290,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         submitButton.textContent = 'جاري إرسال البيانات...';
         submitButton.disabled = true;
-        loadingIndicator.style.display = 'flex'; // 1. تفعيل المؤشر
+        loadingIndicator.style.display = 'flex'; 
         submissionMessage.style.display = 'none';
         
         // 🛑 تسجيل بداية الإرسال
@@ -328,20 +328,12 @@ document.addEventListener('DOMContentLoaded', () => {
             logDebugMessage(`الرد النصي الكامل: ${resultText}`);
 
 
-            // 🛑 محاولة تحليل الـ JSON بأمان
+            // 🛑 بعدين حاول تحويله JSON
             let result;
             try {
-                if (resultText && resultText.trim().startsWith('{')) {
-                    result = JSON.parse(resultText);
-                } else {
-                    // إذا لم يكن الرد JSON، ولكن حالة السيرفر ناجحة، نفترض النجاح
-                    if (response.status >= 200 && response.status < 300) {
-                        result = { success: true, message: "تم افتراض النجاح بناءً على Status 200." };
-                    } else {
-                         throw new Error(`فشل الإرسال: الرد غير صالح وحالة السيرفر هي: ${response.status}`);
-                    }
-                }
+                result = JSON.parse(resultText);
             } catch(e) {
+                // إذا لم يكن الرد بصيغة JSON، فهذه مشكلة في السيرفر أو عملية النشر
                 logDebugMessage(`❌ فشل تحليل الرد إلى JSON. الخطأ: ${e.message}`, true);
                 throw new Error("فشل تحليل الرد من السيرفر. (الرجاء التحقق من نشر Google Script)");
             }
@@ -352,15 +344,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error(result.message || "خطأ أثناء إرسال البيانات: عملية Script فشلت");
             }
             
-            // ✅ النجاح
-            logDebugMessage('✅ نجاح تسجيل البيانات في Google Sheet. جارٍ التوجيه...', false);
+            // 🛑 النجاح
+            logDebugMessage('✅ نجاح تسجيل البيانات في Google Sheet.', false);
             const whatsappURL = buildWhatsappURL(allFields, coursesStringJoined, coursesString.length);
 
             let countdown = 3;
             const timer = setInterval(() => {
                 submissionMessage.textContent = `✅ تم تسجيل بياناتك بنجاح! جارٍ توجيهك خلال ${countdown}...`;
-                submissionMessage.classList.add('status-success');
-                submissionMessage.classList.remove('status-error');
                 submissionMessage.style.display = 'block';
                 countdown--;
                 if (countdown < 0) {
@@ -370,20 +360,18 @@ document.addEventListener('DOMContentLoaded', () => {
             }, 1000);
 
         } catch (error) {
-            // 🛑 معالجة الأخطاء النهائية: إظهار رسالة الفشل فقط
+            // 🛑 معالجة الأخطاء النهائية
             submissionMessage.classList.remove('status-success');
             submissionMessage.classList.add('status-error');
             submissionMessage.textContent = '❌ حدث خطأ أثناء إرسال البيانات. الرجاء المحاولة مرة أخرى.';
             submissionMessage.style.display = 'block';
+            submitButton.textContent = 'إرسال التسجيل الآن';
+            submitButton.disabled = false;
+            submitButton.classList.remove('ready-to-submit');
             
             logDebugMessage(`🛑 الخطأ النهائي في الإرسال: ${error.message}`, true);
-            
-        } **finally** {
-            // 🛑 🛑 الحل الجذري: كتلة finally مسؤولة عن كل أعمال التنظيف 🛑 🛑
-            submitButton.textContent = 'إرسال التسجيل الآن'; // استعادة نص الزر
-            submitButton.disabled = false; // تفعيل الزر
-            submitButton.classList.remove('ready-to-submit'); 
-            loadingIndicator.style.display = 'none'; // إخفاء المؤشر (الأهم)
+        } finally {
+             loadingIndicator.style.display = 'none'; 
         }
     });
     
@@ -402,3 +390,6 @@ document.addEventListener('DOMContentLoaded', () => {
     populateCountries();
     generateCoursesList(); 
 });
+
+
+
