@@ -1,8 +1,9 @@
-// Offer.js - الإصدار النهائي الموحد والأكثر موثوقية (URLSearchParams)
+// Offer.js - الإصدار النهائي الموحد والأكثر موثوقية
 
+// **ملاحظة: يجب تعريف GOOGLE_SCRIPT_URL و INSTITUTION_WHATSAPP_NUMBER 
+// إما في ملف مستقل يتم تحميله قبل هذا الملف، أو تعريفهما هنا مباشرة.**
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbweX983lj4xsTDLo6C64usEcnbFmLST2aQ4v79zjKgIv2v5zGAJERurt_eLXf58dZhtIw/exec'; 
-
-// Offer.js - منطق نموذج التسجيل للعروض الخاصة (الإصدار النهائي والمُصحَّح)
+const INSTITUTION_WHATSAPP_NUMBER = '966500000000'; // مثال: رقم الواتساب الخاص بك
 
 document.addEventListener('DOMContentLoaded', () => {
     // 1. تحديد العناصر (Selectors)
@@ -26,23 +27,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const logDebugMessage = (message, isError = false) => {
         if (!serverDebugLog) return;
         const timestamp = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        const className = isError ? 'log-error' : 'log-info';
         
-        // إنشاء عنصر لـ p لرسالة جديدة
         const p = document.createElement('p');
-        p.classList.add(className);
         p.style.margin = '5px 0';
         p.style.color = isError ? '#a00' : '#005a00';
         p.style.borderBottom = isError ? '1px dashed #fcc' : 'none';
 
-        // محاولة تنسيق الرسالة لتبدو واضحة
         let logMessage = `[${timestamp}] ${message}`;
         
-        // إلحاق الرسالة بالعنصر <pre>
         p.textContent = logMessage;
         serverDebugLog.appendChild(p);
 
-        // التمرير لأسفل تلقائياً لرؤية الرسالة الأحدث
         serverDebugLog.scrollTop = serverDebugLog.scrollHeight;
     };
     
@@ -51,7 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
      * يبني رسالة الواتساب النهائية بعد نجاح الإرسال.
      */
     const buildWhatsappURL = (dataObj, coursesString, coursesCount) => {
-        let messageBody = `مرحباً مؤسسة كن أنت، أرجو تأكيد اشتراكي في عرض VIP. هذه بيانات التسجيل المرسلة عبر النموذج:`;
+        let messageBody = `مرحباً، أرجو تأكيد اشتراكي في عرض VIP. هذه بيانات التسجيل المرسلة عبر النموذج:`;
 
         for (const [key, value] of Object.entries(dataObj)) {
             messageBody += `\n* ${key}: ${value}`;
@@ -61,14 +56,15 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const encodedMessage = encodeURIComponent(messageBody);
         
-        // يعتمد على المتغير INSTITUTION_WHATSAPP_NUMBER المُعرّف في ملف url.js
         return `https://wa.me/${INSTITUTION_WHATSAPP_NUMBER}?text=${encodedMessage}`;
     };
 
     /**
-     * يملأ القائمة المنسدلة للبلدان (يفترض وجود مصفوفة arabCountries معرفة في ملف آخر).
+     * يملأ القائمة المنسدلة للبلدان (يفترض وجود مصفوفة arabCountries).
      */
     const populateCountries = () => {
+        // يجب أن تكون مصفوفة البلدان العربية (arabCountries) معرفة مسبقاً في ملف آخر أو هنا
+        const arabCountries = ["السعودية", "الإمارات", "الكويت", "قطر", "البحرين", "عمان", "الأردن", "لبنان", "مصر", "المغرب", "تونس", "الجزائر", "العراق", "اليمن", "ليبيا", "فلسطين", "سوريا", "السودان", "جيبوتي", "موريتانيا", "الصومال", "جزر القمر"];
         if (typeof arabCountries !== 'undefined' && Array.isArray(arabCountries)) {
             arabCountries.forEach(country => {
                 const option = document.createElement('option');
@@ -84,11 +80,10 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     const generateCoursesList = async () => {
         
-        // 1. تعريف المتغيرات باستخدام رابط النشر (الطريقة الأكثر استقراراً)
+        // 1. تعريف المتغيرات باستخدام رابط النشر
         const PUBLISHED_SHEET_ID = '2PACX-1vR0xJG_95MQb1Dwqzg0Ath0_5RIyqdEoHJIW35rBnW8qy17roXq7-xqyCPZmGx2n3e1aj4jY1zkbRa-';
-        const GID = '1511305260'; // معرّف تبويبة "بيانات_الدورات"
+        const GID = '1511305260'; 
 
-        // الرابط الجديد: جلب بيانات CSV (يتجنب مشاكل استعلامات SQL)
         const COURSES_API_URL = 
             `https://docs.google.com/spreadsheets/d/e/${PUBLISHED_SHEET_ID}/pub?gid=${GID}&single=true&output=csv`;
 
@@ -111,38 +106,33 @@ document.addEventListener('DOMContentLoaded', () => {
                  return;
             }
 
-            // الصف الأول هو رؤوس الأعمدة
             const headers = rows[0].split(',').map(header => header.trim().replace(/"/g, ''));
             const requiredColumns = ['id', 'title', 'heroDescription', 'is_vip']; 
             
             const missingColumns = requiredColumns.filter(col => !headers.includes(col));
             if (missingColumns.length > 0) {
-                 coursesListContainer.innerHTML = `<p class="error-message status-error">❌ خطأ: لم يتم العثور على الأعمدة المطلوبة في الصف الأول: <b>${missingColumns.join(', ')}</b>.</p>`;
+                 coursesListContainer.innerHTML = `<p class="error-message status-error">❌ خطأ: لم يتم العثور على الأعمدة المطلوبة: <b>${missingColumns.join(', ')}</b>.</p>`;
                  logDebugMessage(`خطأ في الأعمدة: الأعمدة المفقودة: ${missingColumns.join(', ')}`, true);
                  return;
             }
 
             const coursesMatrix = [];
             for (let i = 1; i < rows.length; i++) {
-                // تقسيم حسب الفاصلة مع تجاهل الفواصل داخل علامات التنصيص
                 const rowValues = rows[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/); 
                 const course = {};
                 let is_vip_match = false;
                 
                 for (let j = 0; j < headers.length; j++) {
                     const colName = headers[j];
-                    // تنظيف القيمة من المسافات وعلامات التنصيص
                     let value = rowValues[j] ? rowValues[j].trim().replace(/"/g, '') : '';
                     
                     course[colName] = value;
                     
-                    // 🛑 الفلترة: نبحث عن 'Y' في عمود is_vip
                     if (colName === 'is_vip' && value === 'Y') {
                         is_vip_match = true;
                     }
                 }
                 
-                // 🛑 إضافة الدورة فقط إذا كانت VIP وصالحة
                 if (is_vip_match && course.id && course.title) {
                     coursesMatrix.push(course);
                 }
@@ -172,7 +162,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 logDebugMessage(`تم تحميل وتوليد ${coursesMatrix.length} دورة VIP بنجاح.`);
 
             } else {
-                 coursesListContainer.innerHTML = '<p class="error-message status-error">⚠️ لم يتم العثور على دورات VIP. (تأكد من وجود قيمة **Y** في العمود M).</p>';
+                 coursesListContainer.innerHTML = '<p class="error-message status-error">⚠️ لم يتم العثور على دورات VIP. (تأكد من وجود قيمة **Y**).</p>';
                  logDebugMessage('تحذير: لم يتم العثور على دورات VIP بعد الفلترة.', true);
             }
 
@@ -222,17 +212,15 @@ document.addEventListener('DOMContentLoaded', () => {
         return !message;
     };
     
-    // 🛑 التعديل الأخير هنا: تم تبسيط عملية التحقق وتفعيل الزر
     const validateForm = () => {
         let isFormValid = true;
-        // 1. التحقق من الحقول الفردية
+        
         form.querySelectorAll('[required]').forEach(input => {
             if (!validateField(input)) isFormValid = false;
         });
-        // 2. التحقق من الدورات
+        
         if (!updateSelectionStatus(false)) isFormValid = false; 
         
-        // تفعيل أو تعطيل الزر بناءً على صحة النموذج بالكامل
         if (isFormValid) {
             submitButton.classList.add('ready-to-submit');
             submitButton.disabled = false;
@@ -250,7 +238,6 @@ document.addEventListener('DOMContentLoaded', () => {
         updateSelectionStatus();
     };
     
-    // 🛑 التعديل الأخير هنا: تم تبسيط عملية التحقق من حالة الاختيار
     const updateSelectionStatus = (updateValidation = true) => {
         if (!courseCheckboxes) return false;
         const checkedCount = Array.from(courseCheckboxes).filter(cb => cb.checked).length;
@@ -267,7 +254,6 @@ document.addEventListener('DOMContentLoaded', () => {
             coursesErrorElement.textContent = (checkedCount === 0) ? 'الرجاء اختيار دورتين على الأقل.' : `تحتاج لاختيار ${MIN_SELECTION - checkedCount} دورة إضافية.`;
             coursesErrorElement.style.display = 'block';
             
-            // نطلب إعادة التحقق من الفورم بعد تغيير الاختيار
             if (updateValidation) validateForm();
             return false;
         } else {
@@ -275,7 +261,6 @@ document.addEventListener('DOMContentLoaded', () => {
             statusDisplay.classList.add('status-success');
             statusDisplay.textContent = `اختيار موفق! تم اختيار ${checkedCount} دورة. أكمل بيانات التسجيل وأرسلها.`;
             
-            // نطلب إعادة التحقق من الفورم بعد تغيير الاختيار
             if (updateValidation) validateForm();
             return true;
         }
@@ -284,7 +269,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // 5. منطق الإرسال الرئيسي (Submission)
     form.addEventListener('submit', async function(e) {
         e.preventDefault(); 
-        // 🛑 نستخدم validateForm للتأكد من حالة الزر قبل الإرسال
         if (!validateForm()) return; 
 
         submitButton.textContent = 'جاري إرسال البيانات...';
@@ -292,7 +276,6 @@ document.addEventListener('DOMContentLoaded', () => {
         loadingIndicator.style.display = 'flex'; 
         submissionMessage.style.display = 'none';
         
-        // تسجيل بداية الإرسال
         logDebugMessage('بدء عملية إرسال البيانات إلى Google Script...');
 
         const formData = new FormData(this);
@@ -374,7 +357,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             logDebugMessage(`🛑 الخطأ النهائي في الإرسال: ${error.message}`, true);
         } **finally** {
-            // 🛑 🛑 هذه الكتلة تنفذ دائماً لضمان إخفاء المؤشر واستعادة الزر 🛑 🛑
+            // 🛑 هذه الكتلة تنفذ دائماً لضمان إخفاء المؤشر واستعادة الزر 🛑
             submitButton.textContent = 'إرسال التسجيل الآن';
             submitButton.disabled = false;
             submitButton.classList.remove('ready-to-submit');
@@ -388,9 +371,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // 6. تهيئة الصفحة
     form.querySelectorAll('[required]').forEach(input => {
-        input.addEventListener('input', validateForm); // ربط التغيير في الحقول بالتحقق
+        input.addEventListener('input', validateForm); 
         if (input.tagName.toLowerCase() === 'select') {
-            input.addEventListener('change', validateForm); // ربط التغيير في القائمة المنسدلة بالتحقق
+            input.addEventListener('change', validateForm);
         }
     });
 
