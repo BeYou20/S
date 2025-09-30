@@ -1,4 +1,4 @@
-// Offer.js - الإصدار النهائي الموحد والأكثر موثوقية (مع نظام التشخيص المدمج)
+// Offer.js - الإصدار النهائي الموحد والأكثر موثوقية (مع نظام التشخيص الحي)
 
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbweX983lj4xsTDLo6C64usEcnbFmLST2aQ4v79zjKgIv2v5zGAJERurt_eLXf58dZhtIw/exec'; 
 const INSTITUTION_WHATSAPP_NUMBER = '967778185189';
@@ -12,9 +12,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const submitButton = document.getElementById('submitButton');
     const countrySelect = document.getElementById('country');
     const loadingIndicator = document.getElementById('loadingIndicator');
+    // 🚨 عنصر التشخيص الجديد
+    const serverDebugLog = document.getElementById('serverDebugLog'); 
 
     const MIN_SELECTION = 2; // الحد الأدنى لاختيار الدورات
     let courseCheckboxes; // لتخزين جميع Checkboxes بعد التوليد
+
+    /**
+     * دالة مساعدة لتسجيل رسائل التشخيص في عنصر HTML.
+     */
+    const appendToDebugLog = (message, isError = false) => {
+        if (!serverDebugLog) return;
+        const timestamp = new Date().toLocaleTimeString('ar-EG', { hour12: false });
+        const color = isError ? 'red' : 'green';
+        serverDebugLog.innerHTML += `<span style="color: grey;">[${timestamp}]</span> <span style="color: ${color};">${message}</span>\n`;
+        serverDebugLog.scrollTop = serverDebugLog.scrollHeight; // التمرير للأسفل تلقائياً
+        console.log(`[DEBUG] ${message}`); // للإبقاء على تسجيل Console إن أمكن
+    };
 
     // 2. دوال مساعدة وإدارية
     
@@ -36,10 +50,9 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     /**
-     * يملأ القائمة المنسدلة للبلدان (يفترض وجود مصفوفة arabCountries معرفة في ملف آخر).
+     * يملأ القائمة المنسدلة للبلدان.
      */
     const populateCountries = () => {
-        // تم افتراض تعريف مصفوفة البلدان هنا لضمان عمل الكود بشكل مستقل
         const arabCountries = ["السعودية", "الإمارات", "الكويت", "قطر", "البحرين", "عمان", "الأردن", "لبنان", "مصر", "المغرب", "تونس", "الجزائر", "العراق", "اليمن", "ليبيا", "فلسطين", "سوريا", "السودان", "جيبوتي", "موريتانيا", "الصومال", "جزر القمر"];
         if (typeof arabCountries !== 'undefined' && Array.isArray(arabCountries)) {
             arabCountries.forEach(country => {
@@ -52,7 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     /**
-     * يجلب قائمة الدورات من Google Sheet ويولد عناصر HTML، مع طباعة التشخيصات المتقدمة في Console.
+     * يجلب قائمة الدورات من Google Sheet ويولد عناصر HTML، مع طباعة التشخيصات المتقدمة في سجل HTML.
      */
     const generateCoursesList = async () => {
         
@@ -68,26 +81,27 @@ document.addEventListener('DOMContentLoaded', () => {
         submitButton.disabled = true;
 
         try {
-            console.groupCollapsed("⚙️ بدء تشخيص الدورات (generateCoursesList)");
-            console.log(`1. محاولة الجلب من: ${COURSES_API_URL}`);
-
+            appendToDebugLog(`1. بدء الجلب من: ${COURSES_API_URL}`);
+            
             // 2. الجلب من رابط CSV
             const response = await fetch(COURSES_API_URL); 
             
             if (!response.ok) {
-                console.error(`❌ فشل التشخيص (الخطوة 2): حالة السيرفر هي ${response.status}. هذا يعني أن الرابط غير متاح للقراءة العامة أو أن الـ ID غير صحيح.`);
-                 throw new Error(`حالة الاتصال: ${response.status} (تحقق من إعدادات النشر على الويب)`);
+                const errorMessage = `فشل الاتصال: حالة السيرفر ${response.status}. (تحقق من "نشر على الويب" في Sheet).`;
+                appendToDebugLog(errorMessage, true);
+                throw new Error(errorMessage);
             }
             
             const text = await response.text();
-            console.log(`2. نجاح الجلب. عدد الأحرف المستلمة: ${text.length}`);
+            appendToDebugLog(`2. نجاح الجلب. حجم البيانات: ${text.length} حرف.`);
             
             // 3. معالجة بيانات CSV
             const rows = text.split('\n');
             
             if (rows.length < 2) {
-                console.error("❌ فشل التشخيص (الخطوة 3): لم يتم العثور على أسطر بيانات بعد الرؤوس.");
-                 coursesListContainer.innerHTML = '<p class="error-message status-error">⚠️ لم يتم العثور على بيانات في ورقة "بيانات_الدورات".</p>';
+                const errorMessage = 'خطأ: لم يتم العثور على أسطر بيانات بعد الرؤوس.';
+                coursesListContainer.innerHTML = '<p class="error-message status-error">⚠️ لم يتم العثور على بيانات في ورقة "بيانات_الدورات".</p>';
+                appendToDebugLog(errorMessage, true);
                  return;
             }
 
@@ -95,19 +109,19 @@ document.addEventListener('DOMContentLoaded', () => {
             const headers = rows[0].split(',').map(header => header.trim().replace(/"/g, ''));
             const requiredColumns = ['id', 'title', 'heroDescription', 'is_vip']; 
             
-            console.log("3. الرؤوس المُستخلصة:", headers);
+            appendToDebugLog(`3. الرؤوس المُستخلصة: ${headers.join(', ')}`);
             
             const missingColumns = requiredColumns.filter(col => !headers.includes(col));
             if (missingColumns.length > 0) {
-                console.error(`❌ فشل التشخيص (الخطوة 3): الأعمدة المفقودة هي: ${missingColumns.join(', ')}.`);
-                 coursesListContainer.innerHTML = `<p class="error-message status-error">❌ خطأ: لم يتم العثور على الأعمدة المطلوبة: <b>${missingColumns.join(', ')}</b>.</p>`;
+                const errorMessage = `خطأ في رؤوس الأعمدة. الأعمدة المفقودة هي: ${missingColumns.join(', ')}.`;
+                 coursesListContainer.innerHTML = `<p class="error-message status-error">❌ ${errorMessage}</p>`;
+                appendToDebugLog(errorMessage, true);
                  return;
             }
             
-            console.log("4. جميع الأعمدة المطلوبة موجودة. بدء فلترة دورات VIP...");
+            appendToDebugLog("4. جميع الأعمدة المطلوبة موجودة. بدء الفلترة...");
 
             const coursesMatrix = [];
-            let totalCoursesProcessed = 0;
             let vipCoursesFound = 0;
 
             for (let i = 1; i < rows.length; i++) {
@@ -116,7 +130,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 let is_vip_match = false;
                 
                 if (rowValues.every(val => !val.trim())) continue; // تجاهل الأسطر الفارغة
-                totalCoursesProcessed++;
                 
                 for (let j = 0; j < headers.length; j++) {
                     const colName = headers[j];
@@ -137,7 +150,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
             
-            console.log(`5. إنهاء الفلترة. إجمالي الدورات التي تم فحصها: ${totalCoursesProcessed}. دورات VIP المقبولة: ${vipCoursesFound}.`);
+            appendToDebugLog(`5. إنهاء الفلترة. دورات VIP المقبولة: ${vipCoursesFound}.`);
 
             // 6. توليد عناصر الـ Checkboxes
             coursesListContainer.innerHTML = '';
@@ -160,19 +173,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     checkbox.addEventListener('change', handleCourseChange);
                 });
                 updateSelectionStatus();
-                console.log("✅ 6. تم عرض الدورات بنجاح.");
+                appendToDebugLog("6. تم عرض الدورات بنجاح.", false);
 
             } else {
-                console.warn("❌ فشل التشخيص (الخطوة 6): لم يتم العثور على دورات VIP مطابقة لشرط 'Y'.");
-                coursesListContainer.innerHTML = '<p class="error-message status-error">⚠️ لم يتم العثور على دورات VIP. (تأكد من وجود قيمة **Y** في عمود is_vip).</p>';
+                const errorMessage = 'لم يتم العثور على دورات VIP. (تأكد من وجود قيمة **Y** في عمود is_vip).';
+                appendToDebugLog(errorMessage, true);
+                coursesListContainer.innerHTML = `<p class="error-message status-error">⚠️ ${errorMessage}</p>`;
             }
 
         } catch (error) {
-            console.error('❌ خطأ فادح غير متوقع:', error.message);
-            coursesListContainer.innerHTML = `<p class="error-message status-error">❌ فشل غير متوقع. (${error.message || 'حدث خطأ أثناء معالجة البيانات.'})</p>`;
+            // 🚨 عرض أي خطأ يتم إمساكه مباشرة على الشاشة
+            const finalMessage = `❌ فشل فادح: ${error.message}`;
+            appendToDebugLog(finalMessage, true);
+            // إظهار رسالة خطأ قصيرة في مكان الدورات
+            coursesListContainer.innerHTML = `<p class="error-message status-error" style="font-weight: bold; padding: 10px; border: 1px solid red; background: #ffebeb;">${error.message}</p>`;
+
         } finally {
-            console.groupEnd(); // إنهاء مجموعة التشخيص في Console
-            // للتأكد من حالة الزر بعد محاولة جلب الدورات
             if (!courseCheckboxes || courseCheckboxes.length === 0) {
                  submitButton.disabled = true;
             }
