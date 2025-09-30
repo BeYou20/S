@@ -1,7 +1,7 @@
 // Offer.js - الإصدار النهائي الموحد والأكثر موثوقية (URLSearchParams)
 
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbweX983lj4xsTDLo6C64usEcnbFmLST2aQ4v79zjKgIv2v5zGAJERurt_eLXf58dZhtIw/exec'; 
-
+const INSTITUTION_WHATSAPP_NUMBER = '967778185189';
 // Offer.js - منطق نموذج التسجيل للعروض الخاصة (الإصدار النهائي والمُصحَّح)
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -13,40 +13,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const submitButton = document.getElementById('submitButton');
     const countrySelect = document.getElementById('country');
     const loadingIndicator = document.getElementById('loadingIndicator');
-    // 🛑 إضافة عنصر تتبع الأخطاء/السيرفر
-    const serverDebugLog = document.getElementById('serverDebugLog'); 
 
     const MIN_SELECTION = 2; // الحد الأدنى لاختيار الدورات
     let courseCheckboxes; // لتخزين جميع Checkboxes بعد التوليد
 
     // 2. دوال مساعدة وإدارية
-    
-    /**
-     * 🛑 الدالة الجديدة: لتسجيل رسائل التتبع والأخطاء في عنصر HTML مخصص.
-     */
-    const logDebugMessage = (message, isError = false) => {
-        if (!serverDebugLog) return;
-        const timestamp = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        const className = isError ? 'log-error' : 'log-info';
-        
-        // إنشاء عنصر لـ p لرسالة جديدة
-        const p = document.createElement('p');
-        p.classList.add(className);
-        p.style.margin = '5px 0';
-        p.style.color = isError ? '#a00' : '#005a00';
-        p.style.borderBottom = isError ? '1px dashed #fcc' : 'none';
-
-        // محاولة تنسيق الرسالة لتبدو واضحة
-        let logMessage = `[${timestamp}] ${message}`;
-        
-        // إلحاق الرسالة بالعنصر <pre>
-        p.textContent = logMessage;
-        serverDebugLog.appendChild(p);
-
-        // التمرير لأسفل تلقائياً لرؤية الرسالة الأحدث
-        serverDebugLog.scrollTop = serverDebugLog.scrollHeight;
-    };
-    
 
     /**
      * يبني رسالة الواتساب النهائية بعد نجاح الإرسال.
@@ -80,6 +51,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+
+
+
+
+
     /**
      * يجلب قائمة الدورات من Google Sheet ويولد عناصر HTML.
      */
@@ -95,20 +71,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         coursesListContainer.innerHTML = '<div class="loading-courses">جاري تحميل الدورات... <i class="fa-solid fa-spinner fa-spin"></i></div>';
         submitButton.disabled = true;
-        logDebugMessage('بدء جلب قائمة الدورات VIP...');
-
 
         try {
             // 2. الجلب من رابط CSV
             const response = await fetch(COURSES_API_URL); 
             const text = await response.text();
-            logDebugMessage(`نجاح جلب البيانات (Status: ${response.status}). عدد الأسطر: ${text.split('\n').length}`);
 
             // 3. معالجة بيانات CSV
             const rows = text.split('\n');
             if (rows.length < 2) {
                  coursesListContainer.innerHTML = '<p class="error-message status-error">⚠️ لم يتم العثور على بيانات في ورقة "بيانات_الدورات".</p>';
-                 logDebugMessage('خطأ: لم يتم العثور على أسطر بيانات كافية.', true);
                  return;
             }
 
@@ -119,7 +91,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const missingColumns = requiredColumns.filter(col => !headers.includes(col));
             if (missingColumns.length > 0) {
                  coursesListContainer.innerHTML = `<p class="error-message status-error">❌ خطأ: لم يتم العثور على الأعمدة المطلوبة في الصف الأول: <b>${missingColumns.join(', ')}</b>.</p>`;
-                 logDebugMessage(`خطأ في الأعمدة: الأعمدة المفقودة: ${missingColumns.join(', ')}`, true);
                  return;
             }
 
@@ -170,17 +141,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     checkbox.addEventListener('change', handleCourseChange);
                 });
                 updateSelectionStatus();
-                logDebugMessage(`تم تحميل وتوليد ${coursesMatrix.length} دورة VIP بنجاح.`);
 
             } else {
                  coursesListContainer.innerHTML = '<p class="error-message status-error">⚠️ لم يتم العثور على دورات VIP. (تأكد من وجود قيمة **Y** في العمود M).</p>';
-                 logDebugMessage('تحذير: لم يتم العثور على دورات VIP بعد الفلترة.', true);
             }
 
         } catch (error) {
             console.error('فشل جلب قائمة الدورات من Google Sheet:', error);
             coursesListContainer.innerHTML = '<p class="error-message status-error">❌ فشل غير متوقع. (حدث خطأ أثناء معالجة البيانات).</p>';
-            logDebugMessage(`فشل جلب قائمة الدورات: ${error.message}`, true);
         }
     };
     
@@ -292,9 +260,6 @@ document.addEventListener('DOMContentLoaded', () => {
         submitButton.disabled = true;
         loadingIndicator.style.display = 'flex'; 
         submissionMessage.style.display = 'none';
-        
-        // 🛑 تسجيل بداية الإرسال
-        logDebugMessage('بدء عملية إرسال البيانات إلى Google Script...');
 
         const formData = new FormData(this);
         const urlParams = new URLSearchParams(formData); 
@@ -314,38 +279,34 @@ document.addEventListener('DOMContentLoaded', () => {
         const coursesStringJoined = coursesString.join('، '); 
 
         try {
-            // 🛑 الإرسال لجدول Google Sheet (عبر GOOGLE_SCRIPT_URL)
-            const response = await fetch(GOOGLE_SCRIPT_URL, {
-                method: 'POST',
-                body: urlParams
-            });
-            
-            logDebugMessage(`تم استلام الرد من السيرفر. (Status: ${response.status})`);
+            // الإرسال لجدول Google Sheet (عبر GOOGLE_SCRIPT_URL في url.js)
+const response = await fetch(GOOGLE_SCRIPT_URL, {
+    method: 'POST',
+    body: urlParams
+});
 
-            // 🛑 طباعة الرد النصي أولًا
-            const resultText = await response.text();
-            console.log("🔎 رد السيرفر:", resultText);
-            logDebugMessage(`الرد النصي الكامل: ${resultText}`);
+// جرب نطبع الرد النصي أولًا
+const resultText = await response.text();
+console.log("🔎 رد السيرفر:", resultText);
 
+// بعدين حاول تحويله JSON
+let result;
+try {
+    result = JSON.parse(resultText);
+} catch(e) {
+    throw new Error("فشل تحليل الرد من السيرفر: " + resultText);
+}
 
-            // 🛑 بعدين حاول تحويله JSON
-            let result;
-            try {
-                result = JSON.parse(resultText);
-            } catch(e) {
-                // إذا لم يكن الرد بصيغة JSON، فهذه مشكلة في السيرفر أو عملية النشر
-                logDebugMessage(`❌ فشل تحليل الرد إلى JSON. الخطأ: ${e.message}`, true);
-                throw new Error("فشل تحليل الرد من السيرفر. (الرجاء التحقق من نشر Google Script)");
-            }
+if (!result.success) {
+    throw new Error(result.message || "خطأ أثناء إرسال البيانات");
+}
             
-            // 🛑 التحقق من خاصية النجاح (success) في الرد
-            if (!result.success) {
-                logDebugMessage(`❌ فشل إرسال البيانات (Result: false). الرسالة: ${result.message || 'لا توجد رسالة خطأ محددة.'}`, true);
-                throw new Error(result.message || "خطأ أثناء إرسال البيانات: عملية Script فشلت");
-            }
             
-            // 🛑 النجاح
-            logDebugMessage('✅ نجاح تسجيل البيانات في Google Sheet.', false);
+            
+            
+            
+            
+            
             const whatsappURL = buildWhatsappURL(allFields, coursesStringJoined, coursesString.length);
 
             let countdown = 3;
@@ -360,7 +321,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }, 1000);
 
         } catch (error) {
-            // 🛑 معالجة الأخطاء النهائية
             submissionMessage.classList.remove('status-success');
             submissionMessage.classList.add('status-error');
             submissionMessage.textContent = '❌ حدث خطأ أثناء إرسال البيانات. الرجاء المحاولة مرة أخرى.';
@@ -368,8 +328,6 @@ document.addEventListener('DOMContentLoaded', () => {
             submitButton.textContent = 'إرسال التسجيل الآن';
             submitButton.disabled = false;
             submitButton.classList.remove('ready-to-submit');
-            
-            logDebugMessage(`🛑 الخطأ النهائي في الإرسال: ${error.message}`, true);
         } finally {
              loadingIndicator.style.display = 'none'; 
         }
@@ -390,6 +348,3 @@ document.addEventListener('DOMContentLoaded', () => {
     populateCountries();
     generateCoursesList(); 
 });
-
-
-
