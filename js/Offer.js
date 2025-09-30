@@ -1,4 +1,4 @@
-// Offer.js - الإصدار النهائي التشغيلي والمُصَحَّح (مع نظام تحليل البيانات الأقوى)
+// Offer.js - الإصدار النهائي (GID = 0)
 
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbweX983lj4xsTDLo6C64usEcnbFmLST2aQ4v79zjKgIv2v5zGAJERurt_eLXf58dZhtIw/exec'; 
 const INSTITUTION_WHATSAPP_NUMBER = '967778185189';
@@ -60,7 +60,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const generateCoursesList = async () => {
         
         const PUBLISHED_SHEET_ID = '2PACX-1vR0xJG_95MQb1Dwqzg0Ath0_5RIyqdEoHJIW35rBnW8qy17roXq7-xqyCPZmGx2n3e1aj4jY1zkbRa-';
-        const GID = '1511305260'; 
+        // 🛑 التعديل الحاسم: تغيير GID إلى 0 
+        const GID = '0'; 
         const COURSES_API_URL = 
             `https://docs.google.com/spreadsheets/d/e/${PUBLISHED_SHEET_ID}/pub?gid=${GID}&single=true&output=csv`;
 
@@ -68,19 +69,28 @@ document.addEventListener('DOMContentLoaded', () => {
         submitButton.disabled = true;
 
         try {
-            appendToDebugLog(`1. بدء الجلب من: ${COURSES_API_URL.substring(0, 70)}...`);
+            appendToDebugLog(`1. بدء الجلب من: GID=${GID}`);
             
-            // 🚨 تم التأكد من أن الجلب ينجح في هذه المرحلة
             const response = await fetch(COURSES_API_URL); 
+            
+            if (!response.ok) {
+                const errorMessage = `فشل الاتصال: حالة السيرفر ${response.status}.`;
+                appendToDebugLog(errorMessage, true);
+                throw new Error(errorMessage);
+            }
+            
             const text = await response.text();
             appendToDebugLog(`2. نجاح الجلب. تم استلام ${text.length} حرف.`);
             
             // 3. معالجة بيانات CSV
-            const rows = text.trim().split('\n'); // 🛑 تحسين: استخدام trim() قبل التقسيم
+            // 🚨 هنا مكان الفشل المحتمل، لذا سنبقي التشخيص مكثفاً حوله
+            const rows = text.trim().split('\n'); 
+            appendToDebugLog(`3. تم تقسيم النص بنجاح إلى ${rows.length} صف.`); // 🛑 نقطة التشخيص الجديدة
+
             
             if (rows.length < 2) {
                 const errorMessage = 'خطأ: لم يتم العثور على أسطر بيانات بعد الرؤوس.';
-                coursesListContainer.innerHTML = '<p class="error-message status-error">⚠️ لم يتم العثور على بيانات في ورقة "بيانات_الدورات".</p>';
+                coursesListContainer.innerHTML = '<p class="error-message status-error">⚠️ لم يتم العثور على بيانات. (تأكد من GID).</p>';
                 appendToDebugLog(errorMessage, true);
                  return;
             }
@@ -89,7 +99,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const headers = rows[0].split(',').map(header => header.trim().replace(/"/g, ''));
             const requiredColumns = ['id', 'title', 'heroDescription', 'is_vip']; 
             
-            appendToDebugLog(`3. الرؤوس المُستخلصة: ${headers.join(', ')}`);
+            appendToDebugLog(`4. الرؤوس المُستخلصة: ${headers.join(', ')}`);
             
             const missingColumns = requiredColumns.filter(col => !headers.includes(col));
             if (missingColumns.length > 0) {
@@ -99,13 +109,12 @@ document.addEventListener('DOMContentLoaded', () => {
                  return;
             }
             
-            appendToDebugLog("4. جميع الأعمدة المطلوبة موجودة. بدء الفلترة...");
+            appendToDebugLog("5. جميع الأعمدة المطلوبة موجودة. بدء الفلترة...");
 
             const coursesMatrix = [];
             let vipCoursesFound = 0;
 
             for (let i = 1; i < rows.length; i++) {
-                // 🛑 تحسين: استخدام التعبير النمطي المُحسَّن لتقسيم الصفوف
                 const rowValues = rows[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/); 
                 const course = {};
                 let is_vip_match = false;
@@ -114,25 +123,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 for (let j = 0; j < headers.length; j++) {
                     const colName = headers[j];
-                    // 🛑 تحسين: تأكد من تنظيف القيمة من علامات التنصيص والمسافات
                     let value = rowValues[j] ? rowValues[j].trim().replace(/^"|"$/g, '') : ''; 
                     
                     course[colName] = value;
                     
-                    // 🛑 الفلترة: نبحث عن 'Y' أو 'y' في عمود is_vip
                     if (colName === 'is_vip' && value.toUpperCase() === 'Y') {
                         is_vip_match = true;
                     }
                 }
                 
-                // 🛑 إضافة الدورة فقط إذا كانت VIP وصالحة
                 if (is_vip_match && course.id && course.title) {
                     coursesMatrix.push(course);
                     vipCoursesFound++;
                 }
             }
             
-            appendToDebugLog(`5. إنهاء الفلترة. دورات VIP المقبولة: ${vipCoursesFound}.`);
+            appendToDebugLog(`6. إنهاء الفلترة. دورات VIP المقبولة: ${vipCoursesFound}.`);
 
             // 6. توليد عناصر الـ Checkboxes
             coursesListContainer.innerHTML = '';
@@ -149,13 +155,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     coursesListContainer.appendChild(label);
                 });
                 
-                // 7. ربط الأحداث وتحديث الحالة
                 courseCheckboxes = coursesListContainer.querySelectorAll('input[type="checkbox"]');
                 courseCheckboxes.forEach(checkbox => {
                     checkbox.addEventListener('change', handleCourseChange);
                 });
                 updateSelectionStatus();
-                appendToDebugLog("6. تم عرض الدورات بنجاح. انتهى التشخيص.", false);
+                appendToDebugLog("7. تم عرض الدورات بنجاح. انتهى التشخيص.", false);
 
             } else {
                 const errorMessage = 'لم يتم العثور على دورات VIP. (تأكد من وجود قيمة **Y** في عمود is_vip).';
@@ -164,7 +169,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
         } catch (error) {
-            // 🚨 هذا سيمسك أي فشل في التحليل أو الـ DOM
             const finalMessage = `❌ فشل فادح في التحليل/الـ DOM. رسالة الخطأ: ${error.message}`;
             appendToDebugLog(finalMessage, true);
             coursesListContainer.innerHTML = `<p class="error-message status-error" style="font-weight: bold; padding: 10px; border: 1px solid red; background: #ffebeb;">فشل التحليل. راجع سجل التشخيص.</p>`;
@@ -175,6 +179,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     };
+    
+    // ... بقية دوال النموذج (validateForm, updateSelectionStatus, الخ) ...
+    // ... لا تحتاج لتغييرها إذا كنت تستخدم الكود الأخير ...
     
     // 3. دوال التحقق المتقدم (Validation) 
     
@@ -277,12 +284,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // 5. منطق الإرسال الرئيسي (Submission)
     form.addEventListener('submit', async function(e) {
         e.preventDefault(); 
-        // 🛑 نستخدم validateForm للتأكد من حالة الزر قبل الإرسال
         if (!validateForm()) return; 
 
         submitButton.textContent = 'جاري إرسال البيانات...';
         submitButton.disabled = true;
-        loadingIndicator.style.display = 'flex'; // تفعيل المؤشر
+        loadingIndicator.style.display = 'flex';
         submissionMessage.style.display = 'none';
 
         const formData = new FormData(this);
@@ -303,7 +309,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const coursesStringJoined = coursesString.join('، '); 
 
         try {
-            // 🛑 الإرسال لجدول Google Sheet (عبر GOOGLE_SCRIPT_URL)
             const response = await fetch(GOOGLE_SCRIPT_URL, {
                 method: 'POST',
                 body: urlParams
@@ -327,12 +332,10 @@ document.addEventListener('DOMContentLoaded', () => {
                  throw new Error("فشل تحليل الرد من السيرفر. (الرجاء التحقق من نشر Google Script)");
             }
 
-            // 🛑 التحقق من خاصية النجاح (success) في الرد
             if (!result.success) {
                 throw new Error(result.message || "خطأ أثناء إرسال البيانات: عملية Script فشلت");
             }
             
-            // ✅ النجاح
             const whatsappURL = buildWhatsappURL(allFields, coursesStringJoined, coursesString.length);
 
             let countdown = 3;
@@ -353,6 +356,7 @@ document.addEventListener('DOMContentLoaded', () => {
             submissionMessage.classList.add('status-error');
             submissionMessage.textContent = '❌ حدث خطأ أثناء إرسال البيانات. الرجاء المحاولة مرة أخرى.';
             submissionMessage.style.display = 'block';
+            console.error('خطأ في الإرسال:', error.message);
         } **finally** {
             submitButton.textContent = 'إرسال التسجيل الآن'; 
             submitButton.disabled = false; 
