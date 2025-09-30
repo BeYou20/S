@@ -1,6 +1,6 @@
-// Offer.js - الإصدار النهائي الموحد والأكثر موثوقية
+// Offer.js - الإصدار النهائي الموحد والأكثر موثوقية (الحل الجذري لمشكلة المؤشر)
 
-// **ملاحظة: يجب تعريف GOOGLE_SCRIPT_URL و INSTITUTION_WHATSAPP_NUMBER 
+// **ملاحظة: يجب تعريف GOOGLE_SCRIPT_URL و INSTITUTION_WHATSAPP_NUMBER
 // إما في ملف مستقل يتم تحميله قبل هذا الملف، أو تعريفهما هنا مباشرة.**
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbweX983lj4xsTDLo6C64usEcnbFmLST2aQ4v79zjKgIv2v5zGAJERurt_eLXf58dZhtIw/exec'; 
 const INSTITUTION_WHATSAPP_NUMBER = '966500000000'; // مثال: رقم الواتساب الخاص بك
@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const submitButton = document.getElementById('submitButton');
     const countrySelect = document.getElementById('country');
     const loadingIndicator = document.getElementById('loadingIndicator');
+    // 🛑 إضافة عنصر تتبع الأخطاء/السيرفر
     const serverDebugLog = document.getElementById('serverDebugLog'); 
 
     const MIN_SELECTION = 2; // الحد الأدنى لاختيار الدورات
@@ -28,16 +29,20 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!serverDebugLog) return;
         const timestamp = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         
+        // إنشاء عنصر لـ p لرسالة جديدة
         const p = document.createElement('p');
         p.style.margin = '5px 0';
         p.style.color = isError ? '#a00' : '#005a00';
         p.style.borderBottom = isError ? '1px dashed #fcc' : 'none';
 
+        // محاولة تنسيق الرسالة لتبدو واضحة
         let logMessage = `[${timestamp}] ${message}`;
         
+        // إلحاق الرسالة بالعنصر <pre>
         p.textContent = logMessage;
         serverDebugLog.appendChild(p);
 
+        // التمرير لأسفل تلقائياً لرؤية الرسالة الأحدث
         serverDebugLog.scrollTop = serverDebugLog.scrollHeight;
     };
     
@@ -46,7 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
      * يبني رسالة الواتساب النهائية بعد نجاح الإرسال.
      */
     const buildWhatsappURL = (dataObj, coursesString, coursesCount) => {
-        let messageBody = `مرحباً، أرجو تأكيد اشتراكي في عرض VIP. هذه بيانات التسجيل المرسلة عبر النموذج:`;
+        let messageBody = `مرحباً مؤسسة كن أنت، أرجو تأكيد اشتراكي في عرض VIP. هذه بيانات التسجيل المرسلة عبر النموذج:`;
 
         for (const [key, value] of Object.entries(dataObj)) {
             messageBody += `\n* ${key}: ${value}`;
@@ -60,7 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     /**
-     * يملأ القائمة المنسدلة للبلدان (يفترض وجود مصفوفة arabCountries).
+     * يملأ القائمة المنسدلة للبلدان (يفترض وجود مصفوفة arabCountries معرفة في ملف آخر).
      */
     const populateCountries = () => {
         // يجب أن تكون مصفوفة البلدان العربية (arabCountries) معرفة مسبقاً في ملف آخر أو هنا
@@ -80,10 +85,11 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     const generateCoursesList = async () => {
         
-        // 1. تعريف المتغيرات باستخدام رابط النشر
+        // 1. تعريف المتغيرات باستخدام رابط النشر (الطريقة الأكثر استقراراً)
         const PUBLISHED_SHEET_ID = '2PACX-1vR0xJG_95MQb1Dwqzg0Ath0_5RIyqdEoHJIW35rBnW8qy17roXq7-xqyCPZmGx2n3e1aj4jY1zkbRa-';
-        const GID = '1511305260'; 
+        const GID = '1511305260'; // معرّف تبويبة "بيانات_الدورات"
 
+        // الرابط الجديد: جلب بيانات CSV (يتجنب مشاكل استعلامات SQL)
         const COURSES_API_URL = 
             `https://docs.google.com/spreadsheets/d/e/${PUBLISHED_SHEET_ID}/pub?gid=${GID}&single=true&output=csv`;
 
@@ -106,33 +112,38 @@ document.addEventListener('DOMContentLoaded', () => {
                  return;
             }
 
+            // الصف الأول هو رؤوس الأعمدة
             const headers = rows[0].split(',').map(header => header.trim().replace(/"/g, ''));
             const requiredColumns = ['id', 'title', 'heroDescription', 'is_vip']; 
             
             const missingColumns = requiredColumns.filter(col => !headers.includes(col));
             if (missingColumns.length > 0) {
-                 coursesListContainer.innerHTML = `<p class="error-message status-error">❌ خطأ: لم يتم العثور على الأعمدة المطلوبة: <b>${missingColumns.join(', ')}</b>.</p>`;
+                 coursesListContainer.innerHTML = `<p class="error-message status-error">❌ خطأ: لم يتم العثور على الأعمدة المطلوبة في الصف الأول: <b>${missingColumns.join(', ')}</b>.</p>`;
                  logDebugMessage(`خطأ في الأعمدة: الأعمدة المفقودة: ${missingColumns.join(', ')}`, true);
                  return;
             }
 
             const coursesMatrix = [];
             for (let i = 1; i < rows.length; i++) {
+                // تقسيم حسب الفاصلة مع تجاهل الفواصل داخل علامات التنصيص
                 const rowValues = rows[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/); 
                 const course = {};
                 let is_vip_match = false;
                 
                 for (let j = 0; j < headers.length; j++) {
                     const colName = headers[j];
+                    // تنظيف القيمة من المسافات وعلامات التنصيص
                     let value = rowValues[j] ? rowValues[j].trim().replace(/"/g, '') : '';
                     
                     course[colName] = value;
                     
+                    // 🛑 الفلترة: نبحث عن 'Y' في عمود is_vip
                     if (colName === 'is_vip' && value === 'Y') {
                         is_vip_match = true;
                     }
                 }
                 
+                // 🛑 إضافة الدورة فقط إذا كانت VIP وصالحة
                 if (is_vip_match && course.id && course.title) {
                     coursesMatrix.push(course);
                 }
@@ -162,7 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 logDebugMessage(`تم تحميل وتوليد ${coursesMatrix.length} دورة VIP بنجاح.`);
 
             } else {
-                 coursesListContainer.innerHTML = '<p class="error-message status-error">⚠️ لم يتم العثور على دورات VIP. (تأكد من وجود قيمة **Y**).</p>';
+                 coursesListContainer.innerHTML = '<p class="error-message status-error">⚠️ لم يتم العثور على دورات VIP. (تأكد من وجود قيمة **Y** في العمود M).</p>';
                  logDebugMessage('تحذير: لم يتم العثور على دورات VIP بعد الفلترة.', true);
             }
 
@@ -212,15 +223,17 @@ document.addEventListener('DOMContentLoaded', () => {
         return !message;
     };
     
+    // 🛑 تحديث: تبسيط عملية التحقق وتفعيل الزر
     const validateForm = () => {
         let isFormValid = true;
-        
+        // 1. التحقق من الحقول الفردية
         form.querySelectorAll('[required]').forEach(input => {
             if (!validateField(input)) isFormValid = false;
         });
-        
+        // 2. التحقق من الدورات
         if (!updateSelectionStatus(false)) isFormValid = false; 
         
+        // تفعيل أو تعطيل الزر بناءً على صحة النموذج بالكامل
         if (isFormValid) {
             submitButton.classList.add('ready-to-submit');
             submitButton.disabled = false;
@@ -238,6 +251,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updateSelectionStatus();
     };
     
+    // 🛑 تحديث: تبسيط عملية التحقق من حالة الاختيار
     const updateSelectionStatus = (updateValidation = true) => {
         if (!courseCheckboxes) return false;
         const checkedCount = Array.from(courseCheckboxes).filter(cb => cb.checked).length;
@@ -254,6 +268,7 @@ document.addEventListener('DOMContentLoaded', () => {
             coursesErrorElement.textContent = (checkedCount === 0) ? 'الرجاء اختيار دورتين على الأقل.' : `تحتاج لاختيار ${MIN_SELECTION - checkedCount} دورة إضافية.`;
             coursesErrorElement.style.display = 'block';
             
+            // نطلب إعادة التحقق من الفورم بعد تغيير الاختيار
             if (updateValidation) validateForm();
             return false;
         } else {
@@ -261,6 +276,7 @@ document.addEventListener('DOMContentLoaded', () => {
             statusDisplay.classList.add('status-success');
             statusDisplay.textContent = `اختيار موفق! تم اختيار ${checkedCount} دورة. أكمل بيانات التسجيل وأرسلها.`;
             
+            // نطلب إعادة التحقق من الفورم بعد تغيير الاختيار
             if (updateValidation) validateForm();
             return true;
         }
@@ -269,13 +285,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // 5. منطق الإرسال الرئيسي (Submission)
     form.addEventListener('submit', async function(e) {
         e.preventDefault(); 
+        // 🛑 نستخدم validateForm للتأكد من حالة الزر قبل الإرسال
         if (!validateForm()) return; 
 
         submitButton.textContent = 'جاري إرسال البيانات...';
         submitButton.disabled = true;
-        loadingIndicator.style.display = 'flex'; 
+        loadingIndicator.style.display = 'flex'; // 1. تفعيل المؤشر
         submissionMessage.style.display = 'none';
         
+        // 🛑 تسجيل بداية الإرسال
         logDebugMessage('بدء عملية إرسال البيانات إلى Google Script...');
 
         const formData = new FormData(this);
@@ -296,7 +314,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const coursesStringJoined = coursesString.join('، '); 
 
         try {
-            // الإرسال لجدول Google Sheet (عبر GOOGLE_SCRIPT_URL)
+            // 🛑 الإرسال لجدول Google Sheet (عبر GOOGLE_SCRIPT_URL)
             const response = await fetch(GOOGLE_SCRIPT_URL, {
                 method: 'POST',
                 body: urlParams
@@ -304,30 +322,31 @@ document.addEventListener('DOMContentLoaded', () => {
             
             logDebugMessage(`تم استلام الرد من السيرفر. (Status: ${response.status})`);
 
-            // 1. استخلاص الرد النصي الكامل للتتبع
+            // 🛑 طباعة الرد النصي أولًا
             const resultText = await response.text();
             console.log("🔎 رد السيرفر:", resultText);
             logDebugMessage(`الرد النصي الكامل: ${resultText}`);
 
-            // 2. محاولة تحليل الـ JSON بأمان
+
+            // 🛑 محاولة تحليل الـ JSON بأمان
             let result;
             try {
                 if (resultText && resultText.trim().startsWith('{')) {
                     result = JSON.parse(resultText);
                 } else {
-                    logDebugMessage("تحذير: الرد النصي فارغ أو غير بصيغة JSON. نفترض نجاح العملية إذا كان الـ Status 200.", true);
+                    // إذا لم يكن الرد JSON، ولكن حالة السيرفر ناجحة، نفترض النجاح
                     if (response.status >= 200 && response.status < 300) {
                         result = { success: true, message: "تم افتراض النجاح بناءً على Status 200." };
                     } else {
-                        throw new Error("فشل الإرسال: الرد غير صالح وحالة السيرفر غير ناجحة.");
+                         throw new Error(`فشل الإرسال: الرد غير صالح وحالة السيرفر هي: ${response.status}`);
                     }
                 }
             } catch(e) {
-                logDebugMessage(`❌ فشل تحليل الرد إلى JSON. الخطأ: ${e.message}. الرد: ${resultText}`, true);
+                logDebugMessage(`❌ فشل تحليل الرد إلى JSON. الخطأ: ${e.message}`, true);
                 throw new Error("فشل تحليل الرد من السيرفر. (الرجاء التحقق من نشر Google Script)");
             }
             
-            // 3. التحقق من خاصية النجاح (success)
+            // 🛑 التحقق من خاصية النجاح (success) في الرد
             if (!result.success) {
                 logDebugMessage(`❌ فشل إرسال البيانات (Result: false). الرسالة: ${result.message || 'لا توجد رسالة خطأ محددة.'}`, true);
                 throw new Error(result.message || "خطأ أثناء إرسال البيانات: عملية Script فشلت");
@@ -340,6 +359,8 @@ document.addEventListener('DOMContentLoaded', () => {
             let countdown = 3;
             const timer = setInterval(() => {
                 submissionMessage.textContent = `✅ تم تسجيل بياناتك بنجاح! جارٍ توجيهك خلال ${countdown}...`;
+                submissionMessage.classList.add('status-success');
+                submissionMessage.classList.remove('status-error');
                 submissionMessage.style.display = 'block';
                 countdown--;
                 if (countdown < 0) {
@@ -349,19 +370,20 @@ document.addEventListener('DOMContentLoaded', () => {
             }, 1000);
 
         } catch (error) {
-            // 🛑 معالجة الأخطاء النهائية وإظهارها للمستخدم
+            // 🛑 معالجة الأخطاء النهائية: إظهار رسالة الفشل فقط
             submissionMessage.classList.remove('status-success');
             submissionMessage.classList.add('status-error');
             submissionMessage.textContent = '❌ حدث خطأ أثناء إرسال البيانات. الرجاء المحاولة مرة أخرى.';
             submissionMessage.style.display = 'block';
             
             logDebugMessage(`🛑 الخطأ النهائي في الإرسال: ${error.message}`, true);
+            
         } **finally** {
-            // 🛑 هذه الكتلة تنفذ دائماً لضمان إخفاء المؤشر واستعادة الزر 🛑
-            submitButton.textContent = 'إرسال التسجيل الآن';
-            submitButton.disabled = false;
-            submitButton.classList.remove('ready-to-submit');
-            loadingIndicator.style.display = 'none'; 
+            // 🛑 🛑 الحل الجذري: كتلة finally مسؤولة عن كل أعمال التنظيف 🛑 🛑
+            submitButton.textContent = 'إرسال التسجيل الآن'; // استعادة نص الزر
+            submitButton.disabled = false; // تفعيل الزر
+            submitButton.classList.remove('ready-to-submit'); 
+            loadingIndicator.style.display = 'none'; // إخفاء المؤشر (الأهم)
         }
     });
     
@@ -371,9 +393,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // 6. تهيئة الصفحة
     form.querySelectorAll('[required]').forEach(input => {
-        input.addEventListener('input', validateForm); 
+        input.addEventListener('input', validateForm); // ربط التغيير في الحقول بالتحقق
         if (input.tagName.toLowerCase() === 'select') {
-            input.addEventListener('change', validateForm);
+            input.addEventListener('change', validateForm); // ربط التغيير في القائمة المنسدلة بالتحقق
         }
     });
 
