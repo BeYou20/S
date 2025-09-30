@@ -13,7 +13,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const submitButton = document.getElementById('submitButton');
     const countrySelect = document.getElementById('country');
     const loadingIndicator = document.getElementById('loadingIndicator');
-    // 🛑 إضافة عنصر تتبع الأخطاء/السيرفر
     const serverDebugLog = document.getElementById('serverDebugLog'); 
 
     const MIN_SELECTION = 2; // الحد الأدنى لاختيار الدورات
@@ -293,7 +292,7 @@ document.addEventListener('DOMContentLoaded', () => {
         loadingIndicator.style.display = 'flex'; 
         submissionMessage.style.display = 'none';
         
-        // 🛑 تسجيل بداية الإرسال
+        // تسجيل بداية الإرسال
         logDebugMessage('بدء عملية إرسال البيانات إلى Google Script...');
 
         const formData = new FormData(this);
@@ -314,7 +313,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const coursesStringJoined = coursesString.join('، '); 
 
         try {
-            // 🛑 الإرسال لجدول Google Sheet (عبر GOOGLE_SCRIPT_URL)
+            // الإرسال لجدول Google Sheet (عبر GOOGLE_SCRIPT_URL)
             const response = await fetch(GOOGLE_SCRIPT_URL, {
                 method: 'POST',
                 body: urlParams
@@ -322,30 +321,37 @@ document.addEventListener('DOMContentLoaded', () => {
             
             logDebugMessage(`تم استلام الرد من السيرفر. (Status: ${response.status})`);
 
-            // 🛑 طباعة الرد النصي أولًا
+            // 1. استخلاص الرد النصي الكامل للتتبع
             const resultText = await response.text();
             console.log("🔎 رد السيرفر:", resultText);
             logDebugMessage(`الرد النصي الكامل: ${resultText}`);
 
-
-            // 🛑 بعدين حاول تحويله JSON
+            // 2. محاولة تحليل الـ JSON بأمان
             let result;
             try {
-                result = JSON.parse(resultText);
+                if (resultText && resultText.trim().startsWith('{')) {
+                    result = JSON.parse(resultText);
+                } else {
+                    logDebugMessage("تحذير: الرد النصي فارغ أو غير بصيغة JSON. نفترض نجاح العملية إذا كان الـ Status 200.", true);
+                    if (response.status >= 200 && response.status < 300) {
+                        result = { success: true, message: "تم افتراض النجاح بناءً على Status 200." };
+                    } else {
+                        throw new Error("فشل الإرسال: الرد غير صالح وحالة السيرفر غير ناجحة.");
+                    }
+                }
             } catch(e) {
-                // إذا لم يكن الرد بصيغة JSON، فهذه مشكلة في السيرفر أو عملية النشر
-                logDebugMessage(`❌ فشل تحليل الرد إلى JSON. الخطأ: ${e.message}`, true);
+                logDebugMessage(`❌ فشل تحليل الرد إلى JSON. الخطأ: ${e.message}. الرد: ${resultText}`, true);
                 throw new Error("فشل تحليل الرد من السيرفر. (الرجاء التحقق من نشر Google Script)");
             }
             
-            // 🛑 التحقق من خاصية النجاح (success) في الرد
+            // 3. التحقق من خاصية النجاح (success)
             if (!result.success) {
                 logDebugMessage(`❌ فشل إرسال البيانات (Result: false). الرسالة: ${result.message || 'لا توجد رسالة خطأ محددة.'}`, true);
                 throw new Error(result.message || "خطأ أثناء إرسال البيانات: عملية Script فشلت");
             }
             
-            // 🛑 النجاح
-            logDebugMessage('✅ نجاح تسجيل البيانات في Google Sheet.', false);
+            // ✅ النجاح
+            logDebugMessage('✅ نجاح تسجيل البيانات في Google Sheet. جارٍ التوجيه...', false);
             const whatsappURL = buildWhatsappURL(allFields, coursesStringJoined, coursesString.length);
 
             let countdown = 3;
@@ -360,18 +366,19 @@ document.addEventListener('DOMContentLoaded', () => {
             }, 1000);
 
         } catch (error) {
-            // 🛑 معالجة الأخطاء النهائية
+            // 🛑 معالجة الأخطاء النهائية وإظهارها للمستخدم
             submissionMessage.classList.remove('status-success');
             submissionMessage.classList.add('status-error');
             submissionMessage.textContent = '❌ حدث خطأ أثناء إرسال البيانات. الرجاء المحاولة مرة أخرى.';
             submissionMessage.style.display = 'block';
+            
+            logDebugMessage(`🛑 الخطأ النهائي في الإرسال: ${error.message}`, true);
+        } **finally** {
+            // 🛑 🛑 هذه الكتلة تنفذ دائماً لضمان إخفاء المؤشر واستعادة الزر 🛑 🛑
             submitButton.textContent = 'إرسال التسجيل الآن';
             submitButton.disabled = false;
             submitButton.classList.remove('ready-to-submit');
-            
-            logDebugMessage(`🛑 الخطأ النهائي في الإرسال: ${error.message}`, true);
-        } finally {
-             loadingIndicator.style.display = 'none'; 
+            loadingIndicator.style.display = 'none'; 
         }
     });
     
