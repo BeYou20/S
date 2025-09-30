@@ -18,8 +18,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 2. دوال مساعدة وإدارية
     
-    // ملاحظة: تم حذف logDebugMessage لعدم وجود serverDebugLog في كودك المحدث
-
     /**
      * يبني رسالة الواتساب النهائية بعد نجاح الإرسال.
      */
@@ -59,16 +57,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const generateCoursesList = async () => {
         
         // 1. تعريف المتغيرات باستخدام رابط النشر (الطريقة الأكثر استقراراً)
-// تعريف المتغيرات باستخدام رابط النشر النهائي
-const PUBLISHED_SHEET_ID = '2PACX-1vR0xJG_95MQb1Dwqzg0Ath0_5RIyqdEoHJIW35rBnW8qy17roXq7-xqyCPZmGx2n3e1aj4jY1zkbRa-';
-const GID = '1511305260'; // معرّف تبويبة الورقة
+        // 🚨 تم التأكد من أن هذا المُعرِّف هو الصحيح:
+        const PUBLISHED_SHEET_ID = '2PACX-1vR0xJG_95MQb1Dwqzg0Ath0_5RIyqdEoHJIW35rBnW8qy17roXq7-xqyCPZmGx2n3e1aj4jY1zkbRa-';
+        const GID = '1511305260'; // معرّف تبويبة "بيانات_الدورات"
 
-// الرابط النهائي لجلب بيانات CSV
-const COURSES_API_URL =
-        `https://docs.google.com/spreadsheets/d/e/${PUBLISHED_SHEET_ID}/pub?gid=${GID}&single=true&output=csv`;
-
-
-
+        // الرابط النهائي لجلب بيانات CSV
+        const COURSES_API_URL = 
+            `https://docs.google.com/spreadsheets/d/e/${PUBLISHED_SHEET_ID}/pub?gid=${GID}&single=true&output=csv`;
 
         coursesListContainer.innerHTML = '<div class="loading-courses">جاري تحميل الدورات... <i class="fa-solid fa-spinner fa-spin"></i></div>';
         submitButton.disabled = true;
@@ -76,6 +71,12 @@ const COURSES_API_URL =
         try {
             // 2. الجلب من رابط CSV
             const response = await fetch(COURSES_API_URL); 
+            
+            // 🚨 خطوة تصحيح: التحقق من حالة الاستجابة
+            if (!response.ok) {
+                 throw new Error(`فشل جلب البيانات. حالة السيرفر: ${response.status}. (تحقق من أن الورقة منشورة بصيغة CSV)`);
+            }
+            
             const text = await response.text();
 
             // 3. معالجة بيانات CSV
@@ -109,8 +110,8 @@ const COURSES_API_URL =
                     
                     course[colName] = value;
                     
-                    // 🛑 الفلترة: نبحث عن 'Y' في عمود is_vip
-                    if (colName === 'is_vip' && value === 'Y') {
+                    // 🛑 الفلترة المُحسَّنة: نبحث عن 'Y' أو 'y' في عمود is_vip
+                    if (colName === 'is_vip' && value.toUpperCase() === 'Y') {
                         is_vip_match = true;
                     }
                 }
@@ -144,12 +145,17 @@ const COURSES_API_URL =
                 updateSelectionStatus();
 
             } else {
-                 coursesListContainer.innerHTML = '<p class="error-message status-error">⚠️ لم يتم العثور على دورات VIP. (تأكد من وجود قيمة **Y** في العمود M).</p>';
+                 coursesListContainer.innerHTML = '<p class="error-message status-error">⚠️ لم يتم العثور على دورات VIP. (تأكد من وجود قيمة **Y** في عمود is_vip).</p>';
             }
 
         } catch (error) {
-            console.error('فشل جلب قائمة الدورات من Google Sheet:', error);
-            coursesListContainer.innerHTML = '<p class="error-message status-error">❌ فشل غير متوقع. (حدث خطأ أثناء معالجة البيانات).</p>';
+            console.error('فشل جلب قائمة الدورات من Google Sheet:', error.message);
+            coursesListContainer.innerHTML = `<p class="error-message status-error">❌ فشل غير متوقع. (${error.message || 'حدث خطأ أثناء معالجة البيانات.'})</p>`;
+        } finally {
+            // للتأكد من حالة الزر بعد محاولة جلب الدورات
+            if (!courseCheckboxes || courseCheckboxes.length === 0) {
+                 submitButton.disabled = true;
+            }
         }
     };
     
