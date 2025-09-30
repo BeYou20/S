@@ -1,4 +1,4 @@
-// Offer.js - الإصدار النهائي الموحد والأكثر موثوقية (مع نظام التشخيص الحي)
+// Offer.js - الإصدار التشغيلي النهائي (مع نظام التشخيص الحي والمؤكد)
 
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbweX983lj4xsTDLo6C64usEcnbFmLST2aQ4v79zjKgIv2v5zGAJERurt_eLXf58dZhtIw/exec'; 
 const INSTITUTION_WHATSAPP_NUMBER = '967778185189';
@@ -23,6 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     const appendToDebugLog = (message, isError = false) => {
         if (!serverDebugLog) return;
+        // تنسيق الوقت للعرض العربي
         const timestamp = new Date().toLocaleTimeString('ar-EG', { hour12: false });
         const color = isError ? 'red' : 'green';
         serverDebugLog.innerHTML += `<span style="color: grey;">[${timestamp}]</span> <span style="color: ${color};">${message}</span>\n`;
@@ -125,6 +126,7 @@ document.addEventListener('DOMContentLoaded', () => {
             let vipCoursesFound = 0;
 
             for (let i = 1; i < rows.length; i++) {
+                // تقسيم حسب الفاصلة مع تجاهل الفواصل داخل علامات التنصيص
                 const rowValues = rows[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/); 
                 const course = {};
                 let is_vip_match = false;
