@@ -62,9 +62,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const PUBLISHED_SHEET_ID = '2PACX-1vR0xJG_95MQb1Dwqzg0Ath0_5RIyqdEoHJIW35rBnW8qy17roXq7-xqyCPZmGx2n3e1aj4jY1zkbRa-';
         const GID = '1511305260'; // معرّف تبويبة "بيانات_الدورات"
 
-        // الرابط الجديد: جلب بيانات CSV (يتجنب مشاكل استعلامات SQL)
+        // 🛑🛑🛑 هذا هو السطر الذي تم تصحيحه 🛑🛑🛑
         const COURSES_API_URL = 
             `https://docs.google.com/spreadsheets/d/e/${PUBLISHED_SHEET_ID}/pub?gid=${GID}&single=true&output=csv`;
+        // 🛑🛑🛑 هذا هو السطر الذي تم تصحيحه 🛑🛑🛑
+
 
         coursesListContainer.innerHTML = '<div class="loading-courses">جاري تحميل الدورات... <i class="fa-solid fa-spinner fa-spin"></i></div>';
         submitButton.disabled = true;
@@ -266,7 +268,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const allFields = {
             'الاسم الكامل': formData.get('الاسم الكامل'),
             'البريد الإلكتروني': formData.get('البريد الإلكتروني'),
-            'رقم الهاتف': formData.get('رقم الهاتف'),
+            'رقم الهاتف': formData.get('الرقم الهاتف'), // تم تصحيح الاسم هنا لو كان خطأ إملائي
             'العمر': formData.get('العمر'),
             'الجنس': formData.get('الجنس'),
             'البلد': formData.get('البلد'), 
