@@ -1,4 +1,4 @@
-// Offer.js - الإصدار النهائي الموحد والأكثر موثوقية (الحل الجذري لمشكلة المؤشر)
+// Offer.js - الإصدار النهائي الموحد والأكثر موثوقية (مع نظام التشخيص المدمج)
 
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbweX983lj4xsTDLo6C64usEcnbFmLST2aQ4v79zjKgIv2v5zGAJERurt_eLXf58dZhtIw/exec'; 
 const INSTITUTION_WHATSAPP_NUMBER = '967778185189';
@@ -52,16 +52,15 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     /**
-     * يجلب قائمة الدورات من Google Sheet ويولد عناصر HTML.
+     * يجلب قائمة الدورات من Google Sheet ويولد عناصر HTML، مع طباعة التشخيصات المتقدمة في Console.
      */
     const generateCoursesList = async () => {
         
         // 1. تعريف المتغيرات باستخدام رابط النشر (الطريقة الأكثر استقراراً)
-        // 🚨 تم التأكد من أن هذا المُعرِّف هو الصحيح:
         const PUBLISHED_SHEET_ID = '2PACX-1vR0xJG_95MQb1Dwqzg0Ath0_5RIyqdEoHJIW35rBnW8qy17roXq7-xqyCPZmGx2n3e1aj4jY1zkbRa-';
         const GID = '1511305260'; // معرّف تبويبة "بيانات_الدورات"
 
-        // الرابط النهائي لجلب بيانات CSV
+        // الرابط النهائي لجلب بيانات CSV (تم التأكد منه)
         const COURSES_API_URL = 
             `https://docs.google.com/spreadsheets/d/e/${PUBLISHED_SHEET_ID}/pub?gid=${GID}&single=true&output=csv`;
 
@@ -69,19 +68,25 @@ document.addEventListener('DOMContentLoaded', () => {
         submitButton.disabled = true;
 
         try {
+            console.groupCollapsed("⚙️ بدء تشخيص الدورات (generateCoursesList)");
+            console.log(`1. محاولة الجلب من: ${COURSES_API_URL}`);
+
             // 2. الجلب من رابط CSV
             const response = await fetch(COURSES_API_URL); 
             
-            // 🚨 خطوة تصحيح: التحقق من حالة الاستجابة
             if (!response.ok) {
-                 throw new Error(`فشل جلب البيانات. حالة السيرفر: ${response.status}. (تحقق من أن الورقة منشورة بصيغة CSV)`);
+                console.error(`❌ فشل التشخيص (الخطوة 2): حالة السيرفر هي ${response.status}. هذا يعني أن الرابط غير متاح للقراءة العامة أو أن الـ ID غير صحيح.`);
+                 throw new Error(`حالة الاتصال: ${response.status} (تحقق من إعدادات النشر على الويب)`);
             }
             
             const text = await response.text();
-
+            console.log(`2. نجاح الجلب. عدد الأحرف المستلمة: ${text.length}`);
+            
             // 3. معالجة بيانات CSV
             const rows = text.split('\n');
+            
             if (rows.length < 2) {
+                console.error("❌ فشل التشخيص (الخطوة 3): لم يتم العثور على أسطر بيانات بعد الرؤوس.");
                  coursesListContainer.innerHTML = '<p class="error-message status-error">⚠️ لم يتم العثور على بيانات في ورقة "بيانات_الدورات".</p>';
                  return;
             }
@@ -90,22 +95,31 @@ document.addEventListener('DOMContentLoaded', () => {
             const headers = rows[0].split(',').map(header => header.trim().replace(/"/g, ''));
             const requiredColumns = ['id', 'title', 'heroDescription', 'is_vip']; 
             
+            console.log("3. الرؤوس المُستخلصة:", headers);
+            
             const missingColumns = requiredColumns.filter(col => !headers.includes(col));
             if (missingColumns.length > 0) {
-                 coursesListContainer.innerHTML = `<p class="error-message status-error">❌ خطأ: لم يتم العثور على الأعمدة المطلوبة في الصف الأول: <b>${missingColumns.join(', ')}</b>.</p>`;
+                console.error(`❌ فشل التشخيص (الخطوة 3): الأعمدة المفقودة هي: ${missingColumns.join(', ')}.`);
+                 coursesListContainer.innerHTML = `<p class="error-message status-error">❌ خطأ: لم يتم العثور على الأعمدة المطلوبة: <b>${missingColumns.join(', ')}</b>.</p>`;
                  return;
             }
+            
+            console.log("4. جميع الأعمدة المطلوبة موجودة. بدء فلترة دورات VIP...");
 
             const coursesMatrix = [];
+            let totalCoursesProcessed = 0;
+            let vipCoursesFound = 0;
+
             for (let i = 1; i < rows.length; i++) {
-                // تقسيم حسب الفاصلة مع تجاهل الفواصل داخل علامات التنصيص
                 const rowValues = rows[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/); 
                 const course = {};
                 let is_vip_match = false;
                 
+                if (rowValues.every(val => !val.trim())) continue; // تجاهل الأسطر الفارغة
+                totalCoursesProcessed++;
+                
                 for (let j = 0; j < headers.length; j++) {
                     const colName = headers[j];
-                    // تنظيف القيمة من المسافات وعلامات التنصيص
                     let value = rowValues[j] ? rowValues[j].trim().replace(/"/g, '') : '';
                     
                     course[colName] = value;
@@ -119,9 +133,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 // 🛑 إضافة الدورة فقط إذا كانت VIP وصالحة
                 if (is_vip_match && course.id && course.title) {
                     coursesMatrix.push(course);
+                    vipCoursesFound++;
                 }
             }
             
+            console.log(`5. إنهاء الفلترة. إجمالي الدورات التي تم فحصها: ${totalCoursesProcessed}. دورات VIP المقبولة: ${vipCoursesFound}.`);
+
             // 6. توليد عناصر الـ Checkboxes
             coursesListContainer.innerHTML = '';
             if (coursesMatrix.length > 0) {
@@ -143,15 +160,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     checkbox.addEventListener('change', handleCourseChange);
                 });
                 updateSelectionStatus();
+                console.log("✅ 6. تم عرض الدورات بنجاح.");
 
             } else {
-                 coursesListContainer.innerHTML = '<p class="error-message status-error">⚠️ لم يتم العثور على دورات VIP. (تأكد من وجود قيمة **Y** في عمود is_vip).</p>';
+                console.warn("❌ فشل التشخيص (الخطوة 6): لم يتم العثور على دورات VIP مطابقة لشرط 'Y'.");
+                coursesListContainer.innerHTML = '<p class="error-message status-error">⚠️ لم يتم العثور على دورات VIP. (تأكد من وجود قيمة **Y** في عمود is_vip).</p>';
             }
 
         } catch (error) {
-            console.error('فشل جلب قائمة الدورات من Google Sheet:', error.message);
+            console.error('❌ خطأ فادح غير متوقع:', error.message);
             coursesListContainer.innerHTML = `<p class="error-message status-error">❌ فشل غير متوقع. (${error.message || 'حدث خطأ أثناء معالجة البيانات.'})</p>`;
         } finally {
+            console.groupEnd(); // إنهاء مجموعة التشخيص في Console
             // للتأكد من حالة الزر بعد محاولة جلب الدورات
             if (!courseCheckboxes || courseCheckboxes.length === 0) {
                  submitButton.disabled = true;
