@@ -1,8 +1,7 @@
-// Offer.js - الإصدار النهائي الموحد والأكثر موثوقية (URLSearchParams)
+// Offer.js - الإصدار النهائي الموحد والأكثر موثوقية (الحل الجذري لمشكلة المؤشر)
 
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbweX983lj4xsTDLo6C64usEcnbFmLST2aQ4v79zjKgIv2v5zGAJERurt_eLXf58dZhtIw/exec'; 
 const INSTITUTION_WHATSAPP_NUMBER = '967778185189';
-// Offer.js - منطق نموذج التسجيل للعروض الخاصة (الإصدار النهائي والمُصحَّح)
 
 document.addEventListener('DOMContentLoaded', () => {
     // 1. تحديد العناصر (Selectors)
@@ -18,6 +17,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let courseCheckboxes; // لتخزين جميع Checkboxes بعد التوليد
 
     // 2. دوال مساعدة وإدارية
+    
+    // ملاحظة: تم حذف logDebugMessage لعدم وجود serverDebugLog في كودك المحدث
 
     /**
      * يبني رسالة الواتساب النهائية بعد نجاح الإرسال.
@@ -33,7 +34,6 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const encodedMessage = encodeURIComponent(messageBody);
         
-        // يعتمد على المتغير INSTITUTION_WHATSAPP_NUMBER المُعرّف في ملف url.js
         return `https://wa.me/${INSTITUTION_WHATSAPP_NUMBER}?text=${encodedMessage}`;
     };
 
@@ -41,6 +41,8 @@ document.addEventListener('DOMContentLoaded', () => {
      * يملأ القائمة المنسدلة للبلدان (يفترض وجود مصفوفة arabCountries معرفة في ملف آخر).
      */
     const populateCountries = () => {
+        // تم افتراض تعريف مصفوفة البلدان هنا لضمان عمل الكود بشكل مستقل
+        const arabCountries = ["السعودية", "الإمارات", "الكويت", "قطر", "البحرين", "عمان", "الأردن", "لبنان", "مصر", "المغرب", "تونس", "الجزائر", "العراق", "اليمن", "ليبيا", "فلسطين", "سوريا", "السودان", "جيبوتي", "موريتانيا", "الصومال", "جزر القمر"];
         if (typeof arabCountries !== 'undefined' && Array.isArray(arabCountries)) {
             arabCountries.forEach(country => {
                 const option = document.createElement('option');
@@ -50,11 +52,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
     };
-
-
-
-
-
 
     /**
      * يجلب قائمة الدورات من Google Sheet ويولد عناصر HTML.
@@ -191,7 +188,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return !message;
     };
     
-    // 🛑 التعديل الأخير هنا: تم تبسيط عملية التحقق وتفعيل الزر
+    // 🛑 تحديث: تم تبسيط عملية التحقق وتفعيل الزر
     const validateForm = () => {
         let isFormValid = true;
         // 1. التحقق من الحقول الفردية
@@ -219,7 +216,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updateSelectionStatus();
     };
     
-    // 🛑 التعديل الأخير هنا: تم تبسيط عملية التحقق من حالة الاختيار
+    // 🛑 تحديث: تم تبسيط عملية التحقق من حالة الاختيار
     const updateSelectionStatus = (updateValidation = true) => {
         if (!courseCheckboxes) return false;
         const checkedCount = Array.from(courseCheckboxes).filter(cb => cb.checked).length;
@@ -258,7 +255,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         submitButton.textContent = 'جاري إرسال البيانات...';
         submitButton.disabled = true;
-        loadingIndicator.style.display = 'flex'; 
+        loadingIndicator.style.display = 'flex'; // تفعيل المؤشر
         submissionMessage.style.display = 'none';
 
         const formData = new FormData(this);
@@ -279,39 +276,47 @@ document.addEventListener('DOMContentLoaded', () => {
         const coursesStringJoined = coursesString.join('، '); 
 
         try {
-            // الإرسال لجدول Google Sheet (عبر GOOGLE_SCRIPT_URL في url.js)
-const response = await fetch(GOOGLE_SCRIPT_URL, {
-    method: 'POST',
-    body: urlParams
-});
+            // 🛑 الإرسال لجدول Google Sheet (عبر GOOGLE_SCRIPT_URL)
+            const response = await fetch(GOOGLE_SCRIPT_URL, {
+                method: 'POST',
+                body: urlParams
+            });
 
-// جرب نطبع الرد النصي أولًا
-const resultText = await response.text();
-console.log("🔎 رد السيرفر:", resultText);
+            // 🛑 طباعة الرد النصي أولًا
+            const resultText = await response.text();
+            console.log("🔎 رد السيرفر:", resultText);
 
-// بعدين حاول تحويله JSON
-let result;
-try {
-    result = JSON.parse(resultText);
-} catch(e) {
-    throw new Error("فشل تحليل الرد من السيرفر: " + resultText);
-}
+            // 🛑 محاولة تحليل الـ JSON بأمان
+            let result;
+            try {
+                // نتحقق من أن الرد يحتوي على JSON فعلاً قبل محاولة التحليل
+                if (resultText && resultText.trim().startsWith('{')) {
+                    result = JSON.parse(resultText);
+                } else {
+                    // إذا لم يكن الرد JSON، ولكن حالة السيرفر ناجحة، نفترض النجاح
+                    if (response.status >= 200 && response.status < 300) {
+                        result = { success: true, message: "تم افتراض النجاح بناءً على Status 200." };
+                    } else {
+                         throw new Error(`فشل الإرسال: الرد غير صالح وحالة السيرفر هي: ${response.status}`);
+                    }
+                }
+            } catch(e) {
+                 throw new Error("فشل تحليل الرد من السيرفر. (الرجاء التحقق من نشر Google Script)");
+            }
 
-if (!result.success) {
-    throw new Error(result.message || "خطأ أثناء إرسال البيانات");
-}
+            // 🛑 التحقق من خاصية النجاح (success) في الرد
+            if (!result.success) {
+                throw new Error(result.message || "خطأ أثناء إرسال البيانات: عملية Script فشلت");
+            }
             
-            
-            
-            
-            
-            
-            
+            // ✅ النجاح
             const whatsappURL = buildWhatsappURL(allFields, coursesStringJoined, coursesString.length);
 
             let countdown = 3;
             const timer = setInterval(() => {
                 submissionMessage.textContent = `✅ تم تسجيل بياناتك بنجاح! جارٍ توجيهك خلال ${countdown}...`;
+                submissionMessage.classList.add('status-success');
+                submissionMessage.classList.remove('status-error');
                 submissionMessage.style.display = 'block';
                 countdown--;
                 if (countdown < 0) {
@@ -321,15 +326,20 @@ if (!result.success) {
             }, 1000);
 
         } catch (error) {
+            // 🛑 معالجة الأخطاء النهائية: إظهار رسالة الفشل فقط
             submissionMessage.classList.remove('status-success');
             submissionMessage.classList.add('status-error');
             submissionMessage.textContent = '❌ حدث خطأ أثناء إرسال البيانات. الرجاء المحاولة مرة أخرى.';
             submissionMessage.style.display = 'block';
-            submitButton.textContent = 'إرسال التسجيل الآن';
-            submitButton.disabled = false;
-            submitButton.classList.remove('ready-to-submit');
-        } finally {
-             loadingIndicator.style.display = 'none'; 
+            
+            // لا نضع هنا أي كود لاستعادة الزر! نعتمد على finally
+            console.error('خطأ في الإرسال:', error.message);
+        } **finally** {
+            // 🛑 🛑 الحل الجذري: كتلة finally مسؤولة عن كل أعمال التنظيف 🛑 🛑
+            submitButton.textContent = 'إرسال التسجيل الآن'; // استعادة نص الزر
+            submitButton.disabled = false; // تفعيل الزر
+            submitButton.classList.remove('ready-to-submit'); 
+            loadingIndicator.style.display = 'none'; // إخفاء المؤشر (الأهم)
         }
     });
     
